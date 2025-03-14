@@ -69,8 +69,8 @@ const SummaryDisplay: React.FC<SummaryDisplayProps> = ({
   const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-[600px] max-w-full max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="glass-card w-[700px] max-w-full max-h-[90vh] flex flex-col">
         <div className="px-4 py-3 border-b flex justify-between items-center sticky top-0 bg-white">
           <h2 className="text-lg font-semibold text-primary-dark flex items-center">
             <BookOpen size={18} className="mr-2" />

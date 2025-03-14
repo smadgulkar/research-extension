@@ -1,5 +1,5 @@
 import type { Knowledge } from '../storage/db';
-import type { LLMSettings } from '@/types/models';
+import type { LLMSettings, SummaryLength } from '@/types/models';
 
 interface AnalysisResult {
   summary: string;
@@ -25,30 +25,32 @@ export class LLMService {
     this.settings = settings;
   }
 
-  async analyze(text: string, title: string): Promise<AnalysisResult> {
-    const prompt = `Analyze the following webpage content titled "${title}":
-
-${text}
-
-Please provide:
-1. A comprehensive yet concise summary (2-3 paragraphs)
-2. Key points (3-5 bullet points)
-3. Main topics discussed
-4. 5-7 relevant keywords
-5. Overall sentiment
-6. Importance rating (1-5) based on content depth
-7. If applicable, any action items or next steps
-
-Format the response in JSON with the following structure:
-{
-  "summary": "...",
-  "keyPoints": ["...", "..."],
-  "topics": ["...", "..."],
-  "keywords": ["...", "..."],
-  "sentiment": "...",
-  "importance": n,
-  "actionItems": ["...", "..."] // optional
-}`;
+  async analyze(content: string, title: string, summaryLength: SummaryLength = 'medium'): Promise<AnalysisResult> {
+    const lengthInstructions = {
+      short: "Provide a very concise summary in 2-3 sentences.",
+      medium: "Provide a balanced summary in 4-6 sentences.",
+      long: "Provide a comprehensive summary in 7-10 sentences."
+    };
+    
+    const prompt = `
+      Analyze the following web content:
+      Title: ${title}
+      Content: ${content}
+      
+      Provide the following:
+      1. ${lengthInstructions[summaryLength]}
+      2. Extract 3-5 key points from the content.
+      3. Identify 3-7 relevant topics or categories.
+      4. Determine the overall sentiment (positive, negative, neutral, or mixed).
+      
+      Format your response as JSON:
+      {
+        "summary": "The summary of the content",
+        "keyPoints": ["Key point 1", "Key point 2", ...],
+        "topics": ["Topic 1", "Topic 2", ...],
+        "sentiment": "The overall sentiment"
+      }
+    `;
 
     try {
       switch (this.settings.provider.toLowerCase()) {

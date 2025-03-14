@@ -13,8 +13,8 @@ class ResearchDB extends Dexie {
     
     this.version(2).stores({
       highlights: '++id, url, pageTitle, timestamp, keywords',
-      pages: '++id, url, title, timestamp, keywords, importance, lastAccessed',
-      knowledge: '++id, topic, lastUpdated',
+      pages: '++id, url, title, timestamp, keywords, importance, lastAccessed, *topics',
+      knowledge: '++id, topic, content, sourcePages, *tags, confidence, lastUpdated',
       settings: 'id'
     });
   }

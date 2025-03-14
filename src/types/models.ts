@@ -56,3 +56,5 @@ export interface LLMSettings {
   model: string;
   apiKey: string;
 }
+
+export type SummaryLength = 'short' | 'medium' | 'long';

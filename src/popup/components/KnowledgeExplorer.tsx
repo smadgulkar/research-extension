@@ -17,6 +17,8 @@ const KnowledgeExplorer: React.FC<KnowledgeExplorerProps> = ({ settings }) => {
   const [topTopics, setTopTopics] = useState<{topic: string, count: number}[]>([]);
   const [showInfo, setShowInfo] = useState(true);
   const [showGuide, setShowGuide] = useState(false);
+  const [newTag, setNewTag] = useState('');
+  const [editingTagsFor, setEditingTagsFor] = useState<number | null>(null);
 
   useEffect(() => {
     loadKnowledgeBase();
@@ -71,6 +73,32 @@ const KnowledgeExplorer: React.FC<KnowledgeExplorerProps> = ({ settings }) => {
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const addTagToKnowledge = async (knowledgeId: number, tag: string) => {
+    if (!tag.trim()) return;
+    
+    const knowledge = await db.knowledge.get(knowledgeId);
+    if (!knowledge) return;
+    
+    const tags = knowledge.tags || [];
+    if (!tags.includes(tag)) {
+      const updatedTags = [...tags, tag];
+      await db.knowledge.update(knowledgeId, { tags: updatedTags });
+      await loadKnowledgeBase(); // Refresh the knowledge items
+    }
+    
+    setNewTag('');
+  };
+
+  const removeTagFromKnowledge = async (knowledgeId: number, tagToRemove: string) => {
+    const knowledge = await db.knowledge.get(knowledgeId);
+    if (!knowledge) return;
+    
+    const tags = knowledge.tags || [];
+    const updatedTags = tags.filter(tag => tag !== tagToRemove);
+    await db.knowledge.update(knowledgeId, { tags: updatedTags });
+    await loadKnowledgeBase(); // Refresh the knowledge items
   };
 
   return (
@@ -226,8 +254,14 @@ const KnowledgeExplorer: React.FC<KnowledgeExplorerProps> = ({ settings }) => {
                       {item.tags && item.tags.length > 0 && (
                         <div className="w-full mt-2 flex flex-wrap">
                           {item.tags.map((tag, idx) => (
-                            <span key={idx} className="mr-2 mb-1 px-2 py-1 bg-gray-100 rounded-full text-xs">
+                            <span key={idx} className="mr-2 mb-1 px-2 py-1 bg-gray-100 rounded-full text-xs flex items-center">
                               {tag}
+                              <button 
+                                onClick={() => removeTagFromKnowledge(item.id!, tag)}
+                                className="ml-1 text-gray-500 hover:text-red-500"
+                              >
+                                <X size={12} />
+                              </button>
                             </span>
                           ))}
                         </div>
@@ -235,6 +269,37 @@ const KnowledgeExplorer: React.FC<KnowledgeExplorerProps> = ({ settings }) => {
                     </div>
                   </div>
                 </div>
+                {editingTagsFor === item.id && (
+                  <div className="mt-2 flex">
+                    <input
+                      type="text"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      placeholder="Add tag..."
+                      className="text-xs p-2 border rounded-l-lg flex-1"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          addTagToKnowledge(item.id!, newTag);
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => addTagToKnowledge(item.id!, newTag)}
+                      className="text-xs bg-primary text-white px-3 py-1 rounded-r-lg"
+                    >
+                      Add
+                    </button>
+                  </div>
+                )}
+                {editingTagsFor !== item.id && (
+                  <button
+                    onClick={() => setEditingTagsFor(item.id!)}
+                    className="mt-2 text-xs text-primary flex items-center"
+                  >
+                    <Tag size={12} className="mr-1" />
+                    Manage Tags
+                  </button>
+                )}
               </div>
             ))}
           </div>

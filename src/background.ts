@@ -1,14 +1,44 @@
 // In background.ts
 import { db } from './storage/db';
 
+// Listen for extension icon clicks
+chrome.action.onClicked.addListener(() => {
+  // Check if a popup window is already open
+  chrome.windows.getAll({ populate: true }, (windows) => {
+    const existingPopup = windows.find(window => 
+      window.type === 'popup' && 
+      window.tabs && 
+      window.tabs[0] && 
+      window.tabs[0].url && 
+      window.tabs[0].url.includes(chrome.runtime.id)
+    );
+
+    if (existingPopup) {
+      // Focus the existing popup
+      chrome.windows.update(existingPopup.id!, { focused: true });
+    } else {
+      // Create a new popup window
+      chrome.windows.create({
+        url: chrome.runtime.getURL('popup.html'),
+        type: 'popup',
+        width: 800,
+        height: 600,
+        left: (screen.width / 2) - 400, // Center the window
+        top: (screen.height / 2) - 300
+      });
+    }
+  });
+});
+
 console.log('Background script loaded');
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('Background received message:', request);
+// Handle messages from content script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('Background received message:', message);
   
-  if (request.type === 'TEXT_SELECTION_CHANGED') {
+  if (message.type === 'TEXT_SELECTION_CHANGED') {
     // Forward the message to the popup if it's open
-    chrome.runtime.sendMessage(request).catch(() => {
+    chrome.runtime.sendMessage(message).catch(() => {
       // Ignore errors when popup is not open
     });
   }

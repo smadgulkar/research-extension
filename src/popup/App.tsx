@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { db } from '@/storage/db';
 import { LLMService } from '@/services/llm';
 import { Settings, History, Loader, X, BookOpen, Cog, Filter, 
-         LucideIcon, Tag, Clock, Brain } from 'lucide-react';
+         LucideIcon, Tag, Clock, Brain, Book } from 'lucide-react';
 import type { Settings as SettingsType, Highlight } from '@/storage/db';
-import type { Page } from '@/types/models';
+import type { Page, SummaryLength } from '@/types/models';
 import SummaryDisplay from './components/SummaryDisplay';
 import SearchBar from './components/SearchBar';
 import NoteEditor from './components/NoteEditor';
@@ -54,7 +54,7 @@ const DEFAULT_SETTINGS: SettingsType = {
 const TabButton: React.FC<TabButtonProps> = ({ id, icon: Icon, label, activeTab, onTabChange }) => (
   <button
     onClick={() => onTabChange(id)}
-    className={`material-tab ${activeTab === id ? 'active' : ''}`}
+    className={`enhanced-tab flex items-center ${activeTab === id ? 'active' : ''}`}
   >
     <Icon size={16} className="mr-2" />
     <span className="mono-text">{label}</span>
@@ -80,6 +80,9 @@ const App: React.FC = () => {
   const [contentAnalysis, setContentAnalysis] = useState(null);
   const [readingTime, setReadingTime] = useState<number | null>(null);
   const [availableModels, setAvailableModels] = useState<{id: string, name?: string}[]>([]);
+  const [summaryLength, setSummaryLength] = useState<SummaryLength>('medium');
+  const [selectedTextOnly, setSelectedTextOnly] = useState(false);
+  const [selectedText, setSelectedText] = useState('');
 
   // Initialize app data
   useEffect(() => {
@@ -220,14 +223,31 @@ const App: React.FC = () => {
     }
     
     setIsLoading(true);
+    
     try {
+      let contentToAnalyze = currentPage.content;
+      let titleToUse = currentPage.metadata.title;
+      
+      if (selectedTextOnly) {
+        const text = await getSelectedText();
+        if (text) {
+          contentToAnalyze = text;
+          titleToUse = `Selected text from: ${titleToUse}`;
+        } else {
+          setIsLoading(false);
+          // Show message that no text is selected
+          alert('No text selected. Please select text on the page or uncheck the "Analyze selected text only" option.');
+          return;
+        }
+      }
+      
       const llm = new LLMService({
         provider: settings.provider,
         model: settings.model,
         apiKey: settings.apiKey
       });
 
-      const result = await llm.analyze(currentPage.content, currentPage.metadata.title);
+      const result = await llm.analyze(contentToAnalyze, titleToUse, summaryLength);
       setAnalysisResult(result);
       setShowSummary(true);
       
@@ -266,8 +286,6 @@ const App: React.FC = () => {
       await loadSavedPages();
     } catch (error) {
       console.error('Analysis error:', error);
-      alert('Failed to analyze page: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    } finally {
       setIsLoading(false);
     }
   };
@@ -286,363 +304,356 @@ const App: React.FC = () => {
   };
 
   // Update the provider change handler
-  const handleProviderChange = (provider: string) => {
-    setSettings({...settings, provider, model: ''});
-    // Reset model when provider changes
+  const handleProviderChange = async (provider: string) => {
+    // Update provider in settings
+    const updatedSettings = { ...settings, provider, model: '' };
+    setSettings(updatedSettings);
+    
+    // Load available models for the selected provider
+    if (updatedSettings.apiKey) {
+      try {
+        const modelService = new ModelService(updatedSettings);
+        const models = await modelService.getAvailableModels();
+        setAvailableModels(models);
+        
+        // Set a default model if available
+        if (models.length > 0) {
+          setSettings({ ...updatedSettings, model: models[0].id });
+        }
+      } catch (error) {
+        console.error('Error loading models:', error);
+        setAvailableModels([]);
+      }
+    }
   };
 
-  // Add useEffect to fetch models when provider or API key changes
+  // Add this effect to load models when API key changes
   useEffect(() => {
-    if (settings.apiKey) {
-      fetchAvailableModels();
+    const loadModels = async () => {
+      if (settings.apiKey) {
+        try {
+          const modelService = new ModelService(settings);
+          const models = await modelService.getAvailableModels();
+          setAvailableModels(models);
+          
+          // If current model is not in the list, select the first one
+          if (models.length > 0 && !models.some(m => m.id === settings.model)) {
+            setSettings({ ...settings, model: models[0].id });
+          }
+        } catch (error) {
+          console.error('Error loading models:', error);
+        }
+      }
+    };
+    
+    loadModels();
+  }, [settings.apiKey, settings.provider]);
+
+  // Add function to get selected text
+  const getSelectedText = async (): Promise<string> => {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return '';
+      
+      const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_SELECTED_TEXT' });
+      if (response && response.selectedText) {
+        setSelectedText(response.selectedText);
+        return response.selectedText;
+      }
+    } catch (error) {
+      console.error('Error getting selected text:', error);
     }
-  }, [settings.provider, settings.apiKey]);
+    return '';
+  };
 
   // Complete return block for App.tsx
   return (
-    <>
-      <div className="w-full h-full bg-white shadow-xl flex flex-col">
-        {/* Header */}
-        <header className="px-4 py-3 bg-surface border-b flex items-center justify-between">
-          <h1 className="text-lg font-semibold mono-heading text-primary-dark">Research Assistant</h1>
-          <div className="flex space-x-2">
-            {activeTab === 'history' && (
-              <button 
-                onClick={() => setShowFilters(prev => !prev)}
-                className={`p-2 rounded-full transition-colors ${
-                  showFilters ? 'bg-primary-light text-primary-dark' : 'hover:bg-gray-100'
-                }`}
-              >
-                <Filter size={18} />
-              </button>
-            )}
-            <button 
-              onClick={() => setShowSettings(true)}
-              className="p-2 hover:bg-gray-100 rounded-full"
+    <div className="w-full h-full bg-white overflow-auto">
+      <div className="w-full h-full">
+        {/* Clean, minimal header */}
+        <header className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+          <div className="flex items-center">
+            <BookOpen className="text-blue-600 mr-2" size={20} />
+            <h1 className="text-lg font-medium text-gray-800">Research Assistant</h1>
+          </div>
+          <button 
+            onClick={() => setShowSettings(true)}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            aria-label="Settings"
+          >
+            <Settings size={18} className="text-gray-600" />
+          </button>
+        </header>
+        
+        {/* Modern pill-style tab navigation */}
+        <div className="px-5 pt-4 pb-2">
+          <div className="flex bg-gray-100 rounded-full p-1">
+            <button
+              onClick={() => setActiveTab('analyze')}
+              className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition-colors flex items-center justify-center ${
+                activeTab === 'analyze' 
+                  ? 'bg-white text-blue-600 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
             >
-              <Cog size={18} />
+              <Brain size={15} className="mr-1.5" />
+              Analyze
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition-colors flex items-center justify-center ${
+                activeTab === 'history' 
+                  ? 'bg-white text-blue-600 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              <History size={15} className="mr-1.5" />
+              History
+            </button>
+            <button
+              onClick={() => setActiveTab('knowledge')}
+              className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition-colors flex items-center justify-center ${
+                activeTab === 'knowledge' 
+                  ? 'bg-white text-blue-600 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              <Book size={15} className="mr-1.5" />
+              Knowledge
             </button>
           </div>
-        </header>
-
-        {/* Navigation */}
-        <nav className="material-tabs px-4 py-2 border-b">
-          <TabButton
-            id="analyze"
-            icon={BookOpen}
-            label="Analyze"
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
-          <TabButton
-            id="history"
-            icon={History}
-            label="History"
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
-          <TabButton
-            id="knowledge"
-            icon={Brain}
-            label="Knowledge"
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
-        </nav>
-
-        {/* Main Content */}
-        <main className="flex-1 flex overflow-hidden">
-          {/* Filters Sidebar */}
-          {showFilters && activeTab === 'history' && (
-            <aside className="w-48 border-r bg-gray-50 p-4 overflow-y-auto flex flex-col">
-              <div className="space-y-6">
-                <section>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                    <Clock size={14} className="mr-2" />
-                    Time Range
-                  </h3>
-                  <div className="space-y-2">
-                    {['all', 'today', 'week', 'month'].map((range) => (
-                      <label key={range} className="flex items-center space-x-2 text-sm text-gray-600">
-                        <input
-                          type="radio"
-                          checked={filterOptions.dateRange === range}
-                          onChange={() => setFilterOptions(prev => ({
-                            ...prev,
-                            dateRange: range as FilterOptions['dateRange']
-                          }))}
-                          className="text-blue-600"
-                        />
-                        <span className="capitalize">{range}</span>
-                      </label>
-                    ))}
-                  </div>
-                </section>
-
-                <section>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                    <Tag size={14} className="mr-2" />
-                    Topics
-                  </h3>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {uniqueTopics.map((topic: string) => (
-                      <label key={topic} className="flex items-center space-x-2 text-sm text-gray-600">
-                        <input
-                          type="checkbox"
-                          checked={filterOptions.topics.includes(topic)}
-                          onChange={(e) => {
-                            setFilterOptions(prev => ({
-                              ...prev,
-                              topics: e.target.checked
-                                ? [...prev.topics, topic]
-                                : prev.topics.filter(t => t !== topic)
-                            }));
-                          }}
-                          className="text-blue-600"
-                        />
-                        <span className="truncate">{topic}</span>
-                      </label>
-                    ))}
-                  </div>
-                </section>
-              </div>
-            </aside>
-          )}
-
-          {/* Content Area */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-4 space-y-4">
-              {activeTab === 'knowledge' ? (
-                <KnowledgeExplorer settings={settings} />
-              ) : activeTab === 'analyze' ? (
-                <div className="p-4 space-y-6">
-                  <div className="dashboard-section">
-                    <h2 className="mono-heading text-primary-dark mb-4">Page Analysis</h2>
-                    
-                    {currentPage ? (
-                      <>
-                        <div className="mb-4">
-                          <h3 className="text-sm font-medium mono-heading mb-2">{currentPage.metadata.title}</h3>
-                          <p className="text-xs text-gray-500 mono-text mb-4 truncate">{currentPage.metadata.url}</p>
-                          
-                          <div className="bg-gray-50 p-3 rounded-lg mb-4 max-h-32 overflow-y-auto">
-                            <p className="text-xs text-gray-600 mono-text line-clamp-5">
-                              {currentPage.content.substring(0, 300)}...
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <button
-                          onClick={analyzePage}
-                          disabled={isLoading}
-                          className="gradient-button w-full"
-                        >
-                          {isLoading ? (
-                            <>
-                              <Loader size={16} className="animate-spin mr-2" />
-                              Analyzing...
-                            </>
-                          ) : (
-                            <>
-                              <BookOpen size={16} className="mr-2" />
-                              Analyze Page
-                            </>
-                          )}
-                        </button>
-                        
-                        {isLoading && (
-                          <div className="mt-4">
-                            <div className="loading-bar"></div>
-                            <p className="text-center text-xs text-gray-500 mt-2">This may take a moment...</p>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-center py-8 bg-gray-50 rounded-lg">
-                        <BookOpen size={40} className="mx-auto text-gray-300 mb-2" />
-                        <p className="text-gray-500 font-medium">No page content detected</p>
-                        <p className="text-sm text-gray-400 mt-1">Navigate to a webpage to analyze its content</p>
-                      </div>
-                    )}
-                  </div>
+        </div>
+        
+        {/* Content area with clean card design */}
+        <div className="px-5 py-3">
+          {activeTab === 'analyze' && (
+            <div className="space-y-4">
+              {/* Page info card */}
+              {currentPage && (
+                <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+                  <h2 className="text-lg font-medium text-blue-600 mb-2">Page Analysis</h2>
+                  <h3 className="font-medium text-gray-800 mb-1 line-clamp-1">{currentPage.metadata.title}</h3>
+                  <p className="text-xs text-gray-500 mb-3 truncate">{currentPage.metadata.url}</p>
                   
-                  {analysisResult && (
-                    <div className="dashboard-section">
-                      <h2 className="mono-heading text-primary-dark mb-4">Analysis Results</h2>
-                      
-                      <div className="enhanced-card mb-4">
-                        <h3 className="text-sm font-medium mono-heading mb-2 text-primary-dark">Summary</h3>
-                        <p className="mono-text text-sm leading-relaxed">{analysisResult.summary}</p>
-                      </div>
-                      
-                      <div className="enhanced-card mb-4">
-                        <h3 className="text-sm font-medium mono-heading mb-2 text-primary-dark">Key Points</h3>
-                        <ul className="list-disc pl-5 space-y-2">
-                          {analysisResult.keyPoints.map((point, idx) => (
-                            <li key={idx} className="mono-text text-sm">{point}</li>
-                          ))}
-                        </ul>
-                      </div>
-                      
-                      <div className="enhanced-card">
-                        <h3 className="text-sm font-medium mono-heading mb-2 text-primary-dark">Topics & Sentiment</h3>
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          {analysisResult.topics.map((topic, idx) => (
-                            <span key={idx} className="topic-pill">{topic}</span>
-                          ))}
-                        </div>
-                        <p className="mono-text text-sm">
-                          <span className="font-medium">Sentiment:</span> {analysisResult.sentiment}
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                  <div className="bg-gray-50 p-3 rounded-lg mb-4 text-sm text-gray-700 max-h-24 overflow-y-auto">
+                    {currentPage.content.substring(0, 200)}...
+                  </div>
                 </div>
-              ) : activeTab === 'highlights' ? (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-medium text-gray-900">Saved Highlights</h2>
-                    <select 
-                      className="px-3 py-1.5 border rounded-lg text-sm"
-                      onChange={(e) => {
-                        // Filter logic here
-                      }}
+              )}
+              
+              {/* Options card */}
+              <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Summary Length
+                  </label>
+                  <div className="flex space-x-2">
+                    <button 
+                      onClick={() => setSummaryLength('short')}
+                      className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium ${
+                        summaryLength === 'short' 
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                     >
-                      <option value="all">All Pages</option>
-                      <option value="current">Current Page</option>
-                    </select>
+                      Short
+                    </button>
+                    <button 
+                      onClick={() => setSummaryLength('medium')}
+                      className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium ${
+                        summaryLength === 'medium' 
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Medium
+                    </button>
+                    <button 
+                      onClick={() => setSummaryLength('long')}
+                      className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium ${
+                        summaryLength === 'long' 
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Long
+                    </button>
                   </div>
-                  
-                  {savedPages.length > 0 ? (
-                    <div className="space-y-4">
-                      {savedPages.map((page) => (
-                        <div key={page.id} className="highlight-card">
-                          <div className="flex items-start">
-                            <div className="flex-1">
-                              <p className="text-sm mono-text">{page.summary}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <p>No highlights saved yet.</p>
-                      <p className="text-sm mt-1">Select text on any page to create highlights.</p>
-                    </div>
-                  )}
+                </div>
+                
+                <div className="mb-4">
+                  <label className="flex items-center text-sm text-gray-700">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedTextOnly}
+                      onChange={(e) => setSelectedTextOnly(e.target.checked)}
+                      className="mr-2 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Analyze selected text only
+                  </label>
+                </div>
+              </div>
+              
+              {/* Analyze button */}
+              <button 
+                onClick={analyzePage}
+                disabled={isLoading}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg flex items-center justify-center transition-colors shadow-sm"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader size={18} className="animate-spin mr-2" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <BookOpen size={18} className="mr-2" />
+                    ANALYZE PAGE
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+          
+          {activeTab === 'history' && (
+            <div className="space-y-4">
+              <SearchBar onResultsChange={handleSearch} />
+              
+              {savedPages.length > 0 ? (
+                <div className="space-y-3">
+                  {savedPages.map((page) => (
+                    <article 
+                      key={page.id} 
+                      className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => window.open(page.url, '_blank')}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-medium text-gray-800 line-clamp-1">{page.title}</h3>
+                        <time className="text-xs text-gray-500 whitespace-nowrap ml-2">
+                          {new Date(page.timestamp).toLocaleDateString()}
+                        </time>
+                      </div>
+                      
+                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                        {page.summary}
+                      </p>
+                      
+                      <div className="flex flex-wrap gap-2">
+                        {page.topics?.map((topic: string, idx: number) => (
+                          <span key={idx} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-full">
+                            {topic}
+                          </span>
+                        ))}
+                      </div>
+                    </article>
+                  ))}
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <SearchBar onResultsChange={handleSearch} />
-                  
-                  {savedPages.length > 0 ? (
-                    <div className="space-y-3">
-                      {savedPages.map((page) => (
-                        <article 
-                          key={page.id} 
-                          className="material-card cursor-pointer"
-                          onClick={() => window.open(page.url, '_blank')}
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <h3 className="font-medium mono-heading text-primary-dark">{page.title}</h3>
-                            <time className="text-xs text-text-secondary mono-text">
-                              {new Date(page.timestamp).toLocaleDateString()}
-                            </time>
-                          </div>
-                          
-                          <p className="text-sm text-text-secondary mb-3 line-clamp-2">
-                            {page.summary}
-                          </p>
-                          
-                          <div className="flex flex-wrap gap-2">
-                            {page.topics?.map((topic: string, idx: number) => (
-                              <span key={idx} className="material-chip">
-                                {topic}
-                              </span>
-                            ))}
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <p>No pages analyzed yet.</p>
-                    </div>
-                  )}
+                <div className="text-center py-8 text-gray-500">
+                  <p>No pages analyzed yet.</p>
                 </div>
               )}
             </div>
-          </div>
-        </main>
+          )}
+          
+          {activeTab === 'knowledge' && (
+            <KnowledgeExplorer settings={settings} />
+          )}
+        </div>
+        
+        {/* Support link */}
+        <div className="px-5 py-3 mt-auto border-t border-gray-100 text-center">
+          <a 
+            href="https://www.buymeacoffee.com/smadgulkar" 
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:text-blue-800 flex items-center justify-center"
+          >
+            <span className="mr-1">📖</span>
+            Support this project
+          </a>
+        </div>
       </div>
 
-      {/* Settings Modal */}
+      {/* Settings Modal with improved design */}
       {showSettings && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="w-96 bg-white rounded-lg shadow-xl">
-            <div className="px-4 py-3 border-b flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-800">Settings</h2>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-[400px] max-w-full overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-lg font-medium text-gray-800 flex items-center">
+                <Cog size={18} className="mr-2 text-blue-600" />
+                Settings
+              </h2>
               <button 
                 onClick={() => setShowSettings(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
             
-            <div className="p-4 space-y-4">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Provider
                 </label>
                 <select
                   value={settings.provider}
                   onChange={(e) => handleProviderChange(e.target.value)}
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="openai">OpenAI</option>
                   <option value="anthropic">Anthropic</option>
                 </select>
               </div>
               
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   API Key
                 </label>
                 <input
                   type="password"
                   value={settings.apiKey}
                   onChange={(e) => setSettings({...settings, apiKey: e.target.value})}
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder={`Enter your ${settings.provider} API key`}
                 />
               </div>
               
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Model
                 </label>
                 <select
                   value={settings.model}
                   onChange={(e) => setSettings({...settings, model: e.target.value})}
-                  className="material-input"
-                  disabled={availableModels.length === 0}
+                  className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  {settings.model === '' && <option value="">Select a model</option>}
-                  
-                  {availableModels.map(model => (
-                    <option key={model.id} value={model.id}>
-                      {model.name || model.id}
-                    </option>
-                  ))}
-                  
-                  {availableModels.length === 0 && (
+                  {availableModels.length === 0 ? (
                     <option value="" disabled>
                       {settings.apiKey ? 'Loading models...' : 'Enter API key first'}
                     </option>
+                  ) : (
+                    availableModels.map(model => (
+                      <option key={model.id} value={model.id}>
+                        {model.name || model.id}
+                      </option>
+                    ))
                   )}
                 </select>
+              </div>
+              
+              <div className="mt-5 pt-4 border-t border-gray-100 text-center">
+                <p className="text-sm text-gray-600 mb-2">If this extension helped you:</p>
+                <a 
+                  href="https://www.buymeacoffee.com/smadgulkar" 
+                  target="_blank"
+                  rel="noopener noreferrer" 
+                  className="inline-flex items-center justify-center px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-medium rounded-lg transition-colors"
+                >
+                  <span className="mr-2">📖</span>
+                  Buy me a book
+                </a>
               </div>
               
               <button
@@ -650,8 +661,8 @@ const App: React.FC = () => {
                   await db.settings.put(settings);
                   setShowSettings(false);
                 }}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg 
-                  hover:bg-blue-700 transition-colors"
+                className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg 
+                  hover:bg-blue-700 transition-colors font-medium mt-4 shadow-sm"
               >
                 Save Settings
               </button>
@@ -660,7 +671,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Summary Display */}
+      {/* Summary Display with improved design */}
       {showSummary && analysisResult && currentPage && (
         <SummaryDisplay
           summary={analysisResult.summary}
@@ -672,7 +683,7 @@ const App: React.FC = () => {
           onClose={() => setShowSummary(false)}
         />
       )}
-    </>
+    </div>
   );
 };
 
