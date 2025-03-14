@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Research Assistant",
+  "version": "1.0.0",
+  "description": "AI-powered research assistant",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["styles/*", "dist/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
