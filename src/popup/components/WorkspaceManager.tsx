@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Folder } from 'lucide-react';
+import { Plus, Edit2, Trash2, Folder, ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import { db } from '../../storage/db';
 import type { Workspace } from '../../types/models';
 
@@ -27,6 +27,9 @@ const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [newWorkspaceDesc, setNewWorkspaceDesc] = useState('');
   const [selectedColor, setSelectedColor] = useState(WORKSPACE_COLORS[0]);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
 
   useEffect(() => {
     loadWorkspaces();
@@ -138,159 +141,220 @@ const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
     setSelectedColor(workspace.color);
   };
 
+  // Filter workspaces based on search query
+  const filteredWorkspaces = workspaces.filter(workspace => 
+    workspace.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (workspace.description && workspace.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
   return (
-    <div className="mb-6">
-      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
-        <h3 className="font-medium text-blue-800 mb-2">How to Use Workspaces</h3>
-        <ul className="text-sm text-blue-800 list-disc pl-5">
-          <li>Click "New Workspace" to create a workspace</li>
-          <li>Select a workspace to view knowledge items in that workspace</li>
-          <li>Use the edit and delete buttons to manage workspaces</li>
-          <li>When analyzing pages, select which workspace to save knowledge to</li>
-        </ul>
-      </div>
-      
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-gray-800 font-medium flex items-center">
+    <div className="mb-6 border border-gray-200 rounded-lg overflow-hidden">
+      {/* Header with collapse toggle */}
+      <div className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer" 
+           onClick={() => setIsCollapsed(!isCollapsed)}>
+        <div className="flex items-center">
           <Folder size={18} className="mr-2 text-blue-600" />
-          Workspaces
-        </h2>
-        <button 
-          onClick={() => {
-            setIsCreating(true);
-            setNewWorkspaceName('');
-            setNewWorkspaceDesc('');
-            setSelectedColor(WORKSPACE_COLORS[0]);
-          }}
-          className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg flex items-center"
-        >
-          <Plus size={14} className="mr-1" />
-          New Workspace
-        </button>
+          <h2 className="text-gray-800 font-medium">Workspaces</h2>
+          {workspaces.length > 0 && (
+            <span className="ml-2 bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">
+              {workspaces.length}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center">
+          {!isCollapsed && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowSearch(!showSearch);
+              }}
+              className="p-1 mr-2 text-gray-500 hover:text-blue-600 rounded-full hover:bg-gray-200"
+            >
+              <Search size={16} />
+            </button>
+          )}
+          <button className="text-gray-500">
+            {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          </button>
+        </div>
       </div>
 
-      {/* Create/Edit Workspace Form */}
-      {(isCreating || isEditing !== null) && (
-        <div className="bg-white border border-gray-200 rounded-lg mb-4 p-4">
-          <h3 className="font-medium mb-3 text-gray-800">
-            {isCreating ? 'Create New Workspace' : 'Edit Workspace'}
-          </h3>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">Name</label>
+      {/* Collapsible content */}
+      {!isCollapsed && (
+        <div className="p-3">
+          {/* Search bar */}
+          {showSearch && (
+            <div className="mb-3 relative">
               <input
                 type="text"
-                value={newWorkspaceName}
-                onChange={(e) => setNewWorkspaceName(e.target.value)}
-                className="w-full p-2 border rounded-lg"
-                placeholder="Workspace name"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search workspaces..."
+                className="w-full p-2 pl-8 border rounded-lg text-sm"
               />
+              <Search size={14} className="absolute left-2.5 top-2.5 text-gray-400" />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">Description</label>
-              <input
-                type="text"
-                value={newWorkspaceDesc}
-                onChange={(e) => setNewWorkspaceDesc(e.target.value)}
-                className="w-full p-2 border rounded-lg"
-                placeholder="Optional description"
-              />
+          )}
+
+          {/* Help text */}
+          {workspaces.length > 5 && !showSearch && (
+            <div className="text-xs text-gray-500 mb-2 italic">
+              Tip: Use the search icon to find specific workspaces
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">Color</label>
-              <div className="flex space-x-2">
-                {WORKSPACE_COLORS.map((color) => (
-                  <div
-                    key={color}
-                    onClick={() => setSelectedColor(color)}
-                    className={`w-6 h-6 rounded-full cursor-pointer ${
-                      selectedColor === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''
-                    }`}
-                    style={{ backgroundColor: color }}
+          )}
+
+          {/* Create/Edit Workspace Form */}
+          {(isCreating || isEditing !== null) && (
+            <div className="bg-white border border-gray-200 rounded-lg mb-4 p-4">
+              <h3 className="font-medium mb-3 text-gray-800">
+                {isCreating ? 'Create New Workspace' : 'Edit Workspace'}
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">Name</label>
+                  <input
+                    type="text"
+                    value={newWorkspaceName}
+                    onChange={(e) => setNewWorkspaceName(e.target.value)}
+                    className="w-full p-2 border rounded-lg"
+                    placeholder="Workspace name"
                   />
-                ))}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">Description</label>
+                  <input
+                    type="text"
+                    value={newWorkspaceDesc}
+                    onChange={(e) => setNewWorkspaceDesc(e.target.value)}
+                    className="w-full p-2 border rounded-lg"
+                    placeholder="Optional description"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">Color</label>
+                  <div className="flex space-x-2">
+                    {WORKSPACE_COLORS.map((color) => (
+                      <div
+                        key={color}
+                        onClick={() => setSelectedColor(color)}
+                        className={`w-6 h-6 rounded-full cursor-pointer ${
+                          selectedColor === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''
+                        }`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="flex space-x-2 pt-2">
+                  <button
+                    onClick={() => {
+                      isCreating ? createWorkspace() : updateWorkspace(isEditing!);
+                    }}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"
+                  >
+                    {isCreating ? 'Create Workspace' : 'Update Workspace'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsCreating(false);
+                      setIsEditing(null);
+                    }}
+                    className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
-            <div className="flex space-x-2 pt-2">
-              <button
-                onClick={() => {
-                  isCreating ? createWorkspace() : updateWorkspace(isEditing!);
-                }}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"
-              >
-                {isCreating ? 'Create Workspace' : 'Update Workspace'}
-              </button>
-              <button
-                onClick={() => {
-                  setIsCreating(false);
-                  setIsEditing(null);
-                }}
-                className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg text-sm"
-              >
-                Cancel
-              </button>
-            </div>
+          )}
+
+          {/* New Workspace Button */}
+          <button 
+            onClick={() => {
+              setIsCreating(true);
+              setNewWorkspaceName('');
+              setNewWorkspaceDesc('');
+              setSelectedColor(WORKSPACE_COLORS[0]);
+            }}
+            className="w-full mb-3 py-2 bg-blue-50 text-blue-700 rounded-lg flex items-center justify-center hover:bg-blue-100 transition-colors"
+          >
+            <Plus size={16} className="mr-1" />
+            New Workspace
+          </button>
+
+          {/* Workspace List */}
+          <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
+            <button
+              onClick={() => onSelectWorkspace(null)}
+              className={`w-full text-left p-2 rounded-lg flex items-center ${
+                selectedWorkspaceId === null
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'hover:bg-gray-100 text-gray-800'
+              }`}
+            >
+              <Folder size={16} className="mr-2" />
+              <span className="flex-1 text-sm">All Workspaces</span>
+            </button>
+            
+            {filteredWorkspaces.length > 0 ? (
+              filteredWorkspaces.map((workspace) => (
+                <div 
+                  key={workspace.id}
+                  className={`w-full text-left p-2 rounded-lg flex items-center justify-between group ${
+                    selectedWorkspaceId === workspace.id
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'hover:bg-gray-100 text-gray-800'
+                  }`}
+                >
+                  <div 
+                    className="flex items-center flex-1 cursor-pointer"
+                    onClick={() => onSelectWorkspace(workspace.id!)}
+                  >
+                    <div 
+                      className="w-3 h-3 rounded-full mr-2" 
+                      style={{ backgroundColor: workspace.color }}
+                    />
+                    <span className="text-sm truncate">{workspace.name}</span>
+                  </div>
+                  
+                  <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEditing(workspace);
+                      }}
+                      className="p-1 text-gray-500 hover:text-blue-600 rounded-full hover:bg-gray-200"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteWorkspace(workspace.id!);
+                      }}
+                      className="p-1 text-gray-500 hover:text-red-500 rounded-full hover:bg-gray-200"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-3 text-gray-500 text-sm">
+                {searchQuery ? 'No matching workspaces' : 'No workspaces yet'}
+              </div>
+            )}
           </div>
         </div>
       )}
-
-      {/* Workspace List */}
-      <div className="space-y-2">
-        <button
-          onClick={() => onSelectWorkspace(null)}
-          className={`w-full text-left p-3 rounded-lg flex items-center ${
-            selectedWorkspaceId === null
-              ? 'bg-blue-100 text-blue-800'
-              : 'hover:bg-gray-100 text-gray-800'
-          }`}
-        >
-          <Folder size={16} className="mr-2" />
-          <span className="flex-1">All Workspaces</span>
-        </button>
-        
-        {workspaces.map((workspace) => (
-          <div 
-            key={workspace.id}
-            className={`w-full text-left p-3 rounded-lg flex items-center justify-between group ${
-              selectedWorkspaceId === workspace.id
-                ? 'bg-blue-100 text-blue-800'
-                : 'hover:bg-gray-100 text-gray-800'
-            }`}
-          >
-            <div 
-              className="flex items-center flex-1 cursor-pointer"
-              onClick={() => onSelectWorkspace(workspace.id!)}
-            >
-              <div 
-                className="w-4 h-4 rounded-full mr-2" 
-                style={{ backgroundColor: workspace.color }}
-              />
-              <span>{workspace.name}</span>
-            </div>
-            
-            <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  startEditing(workspace);
-                }}
-                className="p-1 text-gray-500 hover:text-blue-600 rounded-full hover:bg-gray-200"
-              >
-                <Edit2 size={14} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteWorkspace(workspace.id!);
-                }}
-                className="p-1 text-gray-500 hover:text-red-500 rounded-full hover:bg-gray-200"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 };
