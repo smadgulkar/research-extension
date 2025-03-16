@@ -27,7 +27,7 @@ const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [newWorkspaceDesc, setNewWorkspaceDesc] = useState('');
   const [selectedColor, setSelectedColor] = useState(WORKSPACE_COLORS[0]);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
 

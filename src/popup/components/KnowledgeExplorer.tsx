@@ -1,5 +1,5 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Search, Book, ArrowRight, ThumbsUp, ThumbsDown, Info, Database, Brain, X, Tag, Clock, Loader } from 'lucide-react';
+import { Search, Book, ArrowRight, ThumbsUp, ThumbsDown, Info, Database, Brain, X, Tag, Clock, Loader, Folder } from 'lucide-react';
 import { db } from '@/storage/db';
 import { KnowledgeService } from '@/services/knowledgeService';
 import type { Knowledge } from '@/storage/db';
@@ -170,75 +170,57 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
         )}
         
         {/* Search Section */}
-        <div className="dashboard-section">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="mono-heading text-primary-dark">Knowledge Explorer</h2>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setShowGuide(true)}
-                className="text-xs text-primary-dark flex items-center hover:underline"
-              >
-                <Info size={12} className="mr-1" />
-                How to use
-              </button>
-              <div className="flex items-center text-sm text-gray-500">
-                <Database size={14} className="mr-1" />
-                <span>{knowledgeItems.length} items</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="relative mb-6">
-            <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <div className="enhanced-card p-4">
+          <div className="relative">
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask a question or search knowledge..."
-              className="w-full pl-10 pr-24 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all font-mono text-sm"
-              onKeyDown={(e) => e.key === 'Enter' && searchKnowledge()}
+              placeholder="Ask a question or search your knowledge base..."
+              className="w-full p-3 pl-10 pr-24 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-500 transition-all"
             />
-            <button 
+            <Search size={18} className="absolute left-3 top-3.5 text-gray-400" />
+            <button
               onClick={searchKnowledge}
-              disabled={isSearching}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 gradient-button py-1 px-3 text-sm"
+              disabled={isSearching || !query.trim()}
+              className="absolute right-2 top-2 px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
             >
               {isSearching ? (
-                <>
+                <div className="flex items-center">
                   <Loader size={14} className="animate-spin mr-1" />
-                  Searching...
-                </>
+                  <span>Searching...</span>
+                </div>
               ) : (
-                <>Search</>
+                "Search"
               )}
             </button>
           </div>
           
-          {/* Popular Topics */}
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-              <Tag size={14} className="mr-2" />
-              Popular Topics
-            </h3>
-            <div className="flex flex-wrap">
-              {topTopics.length > 0 ? (
-                topTopics.map(topic => (
-                  <button 
-                    key={topic.topic}
+          {topTopics.length > 0 && (
+            <div className="mt-3">
+              <div className="text-sm text-gray-600 mb-2 flex items-center">
+                <Tag size={14} className="mr-1" />
+                Popular Topics:
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {topTopics.map(({ topic, count }) => (
+                  <button
+                    key={topic}
                     onClick={() => {
-                      setQuery(topic.topic);
+                      setQuery(topic);
                       searchKnowledge();
                     }}
-                    className="topic-pill"
+                    className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs rounded-full flex items-center"
                   >
-                    {topic.topic} ({topic.count})
+                    {topic}
+                    <span className="ml-1 bg-gray-200 text-gray-700 rounded-full px-1.5 text-xs">
+                      {count}
+                    </span>
                   </button>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500 italic">No topics yet. Analyze pages to build your knowledge base.</p>
-              )}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
         
         {/* Answer Section */}
@@ -347,10 +329,31 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 bg-gray-50 rounded-lg">
-              <Database size={40} className="mx-auto text-gray-300 mb-2" />
-              <p className="text-gray-500 font-medium">No knowledge items found</p>
-              <p className="text-sm text-gray-400 mt-1">Analyze pages to build your knowledge base</p>
+            <div className="text-center py-8">
+              <div className="bg-blue-50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                <Book size={24} className="text-blue-500" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-800 mb-2">Your Knowledge Base is Empty</h3>
+              <p className="text-gray-600 max-w-md mx-auto mb-4">
+                Analyze web pages to automatically extract and store knowledge in your personal database.
+              </p>
+              <button 
+                onClick={() => window.parent.postMessage({ type: 'SWITCH_TAB', tab: 'analyze' }, '*')}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Start Analyzing Pages
+              </button>
+            </div>
+          )}
+          {knowledgeItems.length === 0 && selectedWorkspace !== null && (
+            <div className="text-center py-6 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="text-gray-500 mb-2">
+                <Folder size={24} className="mx-auto mb-2" />
+                <p>This workspace is empty</p>
+              </div>
+              <p className="text-sm text-gray-600 max-w-md mx-auto">
+                Analyze pages and save knowledge to this workspace to see items here.
+              </p>
             </div>
           )}
         </div>
