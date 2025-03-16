@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '@/storage/db';
 import { LLMService } from '@/services/llm';
 import { Settings, History, Loader, X, BookOpen, Cog, Filter, 
-         LucideIcon, Tag, Clock, Brain, Book } from 'lucide-react';
+         LucideIcon, Tag, Clock, Brain, Book, Folder } from 'lucide-react';
 import type { Settings as SettingsType, Highlight } from '@/storage/db';
 import type { Page, SummaryLength } from '@/types/models';
 import SummaryDisplay from './components/SummaryDisplay';
@@ -13,6 +13,10 @@ import KnowledgeExplorer from './components/KnowledgeExplorer';
 import { ContentAnalyzer } from '@/services/contentAnalyzer';
 import { ModelService } from '@/services/modelService';
 import { KnowledgeService } from '@/services/knowledgeService';
+import { migrateToWorkspaces } from '../migration';
+import PageAnalyzer from './components/PageAnalyzer';
+import WorkspaceManager from './components/WorkspaceManager';
+import { KnowledgeExplorerRef } from './components/KnowledgeExplorer';
 
 interface TabButtonProps {
   id: string;
@@ -83,6 +87,7 @@ const App: React.FC = () => {
   const [summaryLength, setSummaryLength] = useState<SummaryLength>('medium');
   const [selectedTextOnly, setSelectedTextOnly] = useState(false);
   const [selectedText, setSelectedText] = useState('');
+  const knowledgeExplorerRef = useRef<KnowledgeExplorerRef>(null);
 
   // Initialize app data
   useEffect(() => {
@@ -284,6 +289,7 @@ const App: React.FC = () => {
       }
       
       await loadSavedPages();
+      handleAnalysisComplete(page);
     } catch (error) {
       console.error('Analysis error:', error);
       setIsLoading(false);
@@ -364,6 +370,13 @@ const App: React.FC = () => {
       console.error('Error getting selected text:', error);
     }
     return '';
+  };
+
+  // When analysis is complete, refresh the knowledge base
+  const handleAnalysisComplete = (page: Page) => {
+    if (knowledgeExplorerRef.current) {
+      knowledgeExplorerRef.current.reloadKnowledgeBase();
+    }
   };
 
   // Complete return block for App.tsx
@@ -512,6 +525,15 @@ const App: React.FC = () => {
                   </>
                 )}
               </button>
+
+              {/* Add PageAnalyzer here */}
+              <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+                <h3 className="font-medium text-gray-800 mb-3">Workspace Selection</h3>
+                <PageAnalyzer 
+                  settings={settings}
+                  onAnalysisComplete={handleAnalysisComplete}
+                />
+              </div>
             </div>
           )}
           
@@ -557,7 +579,12 @@ const App: React.FC = () => {
           )}
           
           {activeTab === 'knowledge' && (
-            <KnowledgeExplorer settings={settings} />
+            <div className="space-y-4">
+              <KnowledgeExplorer 
+                ref={knowledgeExplorerRef}
+                settings={settings} 
+              />
+            </div>
           )}
         </div>
         

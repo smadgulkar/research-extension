@@ -12,14 +12,14 @@ export class KnowledgeService {
     this.settings = settings;
   }
 
-  async processPage(page: Page): Promise<void> {
+  async processPage(page: Page, workspaceId: number | null = null): Promise<void> {
     try {
       // Extract knowledge from the page
       const prompt = `
         Based on the following content, extract 3-5 key knowledge points:
         Title: ${page.title}
-        Content: ${page.content.substring(0, 5000)}... // Limit content length
-        Summary: ${page.summary}
+        Content: ${page.content?.substring(0, 5000) || ''}... // Limit content length
+        Summary: ${page.summary || ''}
         
         For each knowledge point:
         1. Identify a specific topic
@@ -46,7 +46,29 @@ export class KnowledgeService {
       const knowledge = await llm.extractKnowledge(prompt);
       console.log('Extracted knowledge:', knowledge);
       
-      // Store knowledge points
+      // If no workspace is specified, use the default workspace
+      let targetWorkspaceId = workspaceId;
+      
+      if (targetWorkspaceId === null) {
+        // Get or create default workspace
+        let defaultWorkspace = await db.workspaces.where('name').equals('Default').first();
+        
+        if (!defaultWorkspace) {
+          const defaultId = await db.workspaces.add({
+            name: 'Default',
+            description: 'Default workspace',
+            color: '#4299E1',
+            createdAt: new Date(),
+            lastAccessed: new Date()
+          });
+          defaultWorkspace = await db.workspaces.get(defaultId as number);
+          targetWorkspaceId = defaultWorkspace?.id || null;
+        } else {
+          targetWorkspaceId = defaultWorkspace.id!;
+        }
+      }
+      
+      // Store knowledge points with workspace ID
       for (const point of knowledge) {
         await db.knowledge.add({
           topic: point.topic,
@@ -54,30 +76,44 @@ export class KnowledgeService {
           sourcePages: [page.id!],
           lastUpdated: new Date(),
           confidence: point.confidence,
-          tags: page.topics || []
+          tags: page.topics || [],
+          workspaceId: targetWorkspaceId!
         });
       }
       
-      console.log('Knowledge stored successfully');
+      console.log('Knowledge stored successfully in workspace:', targetWorkspaceId);
     } catch (error) {
       console.error('Error processing page for knowledge:', error);
+      throw error; // Re-throw to allow caller to handle
     }
   }
 
-  async queryKnowledge(query: string): Promise<{
-    relevantKnowledge: Knowledge[];
-    synthesizedAnswer: string;
-  }> {
-    // Find relevant knowledge points
-    const allKnowledge = await db.knowledge.toArray();
-    const relevantKnowledge = await this.llm.findRelevantKnowledge(query, allKnowledge);
+  async queryKnowledge(query: string, workspaceId: number | null = null): Promise<any> {
+    try {
+      // Get relevant knowledge items
+      let knowledgeItems;
+      
+      if (workspaceId === null) {
+        // Search across all workspaces
+        knowledgeItems = await db.knowledge.toArray();
+      } else {
+        // Search only in the selected workspace
+        knowledgeItems = await db.knowledge.where('workspaceId').equals(workspaceId).toArray();
+      }
+      
+      // Find relevant knowledge points
+      const relevantKnowledge = await this.llm.findRelevantKnowledge(query, knowledgeItems);
 
-    // Synthesize an answer
-    const synthesizedAnswer = await this.llm.synthesizeAnswer(query, relevantKnowledge);
+      // Synthesize an answer
+      const synthesizedAnswer = await this.llm.synthesizeAnswer(query, relevantKnowledge);
 
-    return {
-      relevantKnowledge,
-      synthesizedAnswer
-    };
+      return {
+        relevantKnowledge,
+        synthesizedAnswer
+      };
+    } catch (error) {
+      console.error('Error querying knowledge:', error);
+      throw error;
+    }
   }
 } 

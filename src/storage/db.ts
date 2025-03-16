@@ -1,21 +1,23 @@
 // src/storage/db.ts
 import Dexie, { Table } from 'dexie';
-import type { Highlight, Page, Knowledge, Settings } from '../types/models';
+import type { Highlight, Page, Knowledge, Settings, Workspace } from '../types/models';
 
 class ResearchDB extends Dexie {
   highlights!: Table<Highlight>;
   pages!: Table<Page>;
   knowledge!: Table<Knowledge>;
   settings!: Table<Settings>;
+  workspaces!: Table<Workspace>;
 
   constructor() {
     super('ResearchDB');
     
-    this.version(2).stores({
+    this.version(3).stores({
       highlights: '++id, url, pageTitle, timestamp, keywords',
       pages: '++id, url, title, timestamp, keywords, importance, lastAccessed, *topics',
-      knowledge: '++id, topic, content, sourcePages, *tags, confidence, lastUpdated',
-      settings: 'id'
+      knowledge: '++id, topic, content, sourcePages, *tags, confidence, lastUpdated, workspaceId',
+      settings: 'id',
+      workspaces: '++id, name, createdAt, lastAccessed'
     });
   }
 }

@@ -42,6 +42,16 @@ export interface Knowledge {
   lastUpdated: Date;
   confidence: number;
   tags: string[];
+  workspaceId: number;
+}
+
+export interface Workspace {
+  id?: number;
+  name: string;
+  description: string;
+  color: string;
+  createdAt: Date;
+  lastAccessed?: Date;
 }
 
 export interface Settings {
