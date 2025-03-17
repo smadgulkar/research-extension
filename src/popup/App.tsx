@@ -17,6 +17,7 @@ import { migrateToWorkspaces } from '../migration';
 import PageAnalyzer from './components/PageAnalyzer';
 import WorkspaceManager from './components/WorkspaceManager';
 import { KnowledgeExplorerRef } from './components/KnowledgeExplorer';
+import BuyMeButton from './components/BuyMeButton';
 
 interface TabButtonProps {
   id: string;
@@ -88,11 +89,15 @@ const App: React.FC = () => {
   const [selectedTextOnly, setSelectedTextOnly] = useState(false);
   const [selectedText, setSelectedText] = useState('');
   const knowledgeExplorerRef = useRef<KnowledgeExplorerRef>(null);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number | null>(null);
 
   // Initialize app data
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Initialize default workspace if it doesn't exist
+        await initializeDefaultWorkspace();
+        
         await Promise.all([
           loadCurrentPage(),
           loadSettings(),
@@ -216,82 +221,85 @@ const App: React.FC = () => {
 
   // Page analysis function
   const analyzePage = async () => {
-    if (!currentPage) {
-      alert('No page content to analyze');
+    if (!currentPage || isLoading) return;
+    
+    // Check if API key is set
+    if (!settings.apiKey) {
+      alert('Please set your API key in the settings before analyzing pages.');
+      setShowSettings(true);
       return;
     }
     
-    if (!settings.apiKey) {
-      setShowSettings(true); // Open settings dialog
-      alert('Please configure your API key in settings first');
-      return;
+    // Check if provider is set
+    if (!settings.provider) {
+      // Default to OpenAI if not set
+      setSettings({...settings, provider: 'openai'});
     }
     
     setIsLoading(true);
     
     try {
-      let contentToAnalyze = currentPage.content;
-      let titleToUse = currentPage.metadata.title;
+      console.log('Starting page analysis...');
       
-      if (selectedTextOnly) {
-        const text = await getSelectedText();
-        if (text) {
-          contentToAnalyze = text;
-          titleToUse = `Selected text from: ${titleToUse}`;
-        } else {
-          setIsLoading(false);
-          // Show message that no text is selected
-          alert('No text selected. Please select text on the page or uncheck the "Analyze selected text only" option.');
-          return;
-        }
+      // Check if we have content to analyze
+      if (!currentPage.content) {
+        console.error('No content to analyze');
+        return;
       }
       
-      const llm = new LLMService({
-        provider: settings.provider,
-        model: settings.model,
-        apiKey: settings.apiKey
-      });
-
-      const result = await llm.analyze(contentToAnalyze, titleToUse, summaryLength);
+      const llmService = new LLMService(settings);
+      const analyzer = new ContentAnalyzer(llmService);
+      
+      // Add logging to debug
+      console.log('Analyzing content with URL:', currentPage.metadata.url);
+      
+      // Make sure we're passing the correct parameters
+      const result = await analyzer.analyzeContent(
+        currentPage.content,
+        currentPage.metadata.url
+      );
+      
+      console.log('Analysis result:', result);
+      
+      if (!result) {
+        console.error('No result returned from analyzer');
+        return;
+      }
+      
       setAnalysisResult(result);
       setShowSummary(true);
       
-      // Save the page to history
+      // Create a page object
       const page: Page = {
         url: currentPage.metadata.url,
         title: currentPage.metadata.title,
-        content: currentPage.content,
-        summary: result.summary,
-        keyPoints: result.keyPoints,
-        topics: result.topics,
-        keywords: result.keywords || [],
-        sentiment: result.sentiment,
-        importance: result.importance,
-        readingTime: result.readingTime,
-        timestamp: new Date(),
-        lastAccessed: new Date()
+        content: currentPage.content.substring(0, 1000),
+        summary: result.summary || '',
+        keyPoints: result.keyPoints || [],
+        topics: result.topics || [],
+        sentiment: result.sentiment || '',
+        keywords: result.topics || [],
+        timestamp: new Date()
       };
       
-      await db.pages.put(page);
+      console.log('Saving page to database:', page);
       
-      // Add this code to process the page for knowledge extraction
-      try {
-        const knowledgeService = new KnowledgeService({
-          provider: settings.provider,
-          model: settings.model,
-          apiKey: settings.apiKey
-        });
-        
-        await knowledgeService.processPage(page);
-        console.log('Knowledge extracted and stored successfully');
-      } catch (error) {
-        console.error('Error processing knowledge:', error);
-      }
+      // Save the page
+      const pageId = await db.pages.add(page);
+      
+      // Process knowledge with the selected workspace
+      const knowledgeService = new KnowledgeService(settings);
+      await knowledgeService.processPage({...page, id: pageId as number}, selectedWorkspaceId);
       
       await loadSavedPages();
       handleAnalysisComplete(page);
+      
+      console.log('Analysis completed successfully');
     } catch (error) {
       console.error('Analysis error:', error);
+      // Show error to user
+      alert(`Error analyzing page: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -379,10 +387,38 @@ const App: React.FC = () => {
     }
   };
 
+  // Add this function to initialize the default workspace
+  const initializeDefaultWorkspace = async () => {
+    try {
+      // Check if default workspace exists
+      let defaultWorkspace = await db.workspaces.where('name').equals('Default').first();
+      
+      if (!defaultWorkspace) {
+        // Create default workspace
+        const defaultId = await db.workspaces.add({
+          name: 'Default',
+          description: 'Default workspace',
+          color: '#4299E1',
+          createdAt: new Date(),
+          lastAccessed: new Date()
+        });
+        
+        defaultWorkspace = await db.workspaces.get(defaultId as number);
+      }
+      
+      // Set the default workspace as selected
+      if (defaultWorkspace?.id) {
+        setSelectedWorkspaceId(defaultWorkspace.id);
+      }
+    } catch (error) {
+      console.error('Error initializing default workspace:', error);
+    }
+  };
+
   // Complete return block for App.tsx
   return (
     <div className="w-full h-full bg-white overflow-auto">
-      <div className="w-full h-full">
+      <div className="w-full h-full p-4 flex flex-col">
         {/* Clean, minimal header */}
         <header className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
           <div className="flex items-center">
@@ -438,7 +474,7 @@ const App: React.FC = () => {
         </div>
         
         {/* Content area with clean card design */}
-        <div className="px-5 py-3">
+        <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4 flex-grow overflow-auto">
           {activeTab === 'analyze' && (
             <div className="space-y-4">
               {/* Page info card */}
@@ -454,84 +490,65 @@ const App: React.FC = () => {
                 </div>
               )}
               
-              {/* Options card */}
-              <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Summary Length
-                  </label>
-                  <div className="flex space-x-2">
-                    <button 
-                      onClick={() => setSummaryLength('short')}
-                      className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium ${
-                        summaryLength === 'short' 
-                          ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Short
-                    </button>
-                    <button 
-                      onClick={() => setSummaryLength('medium')}
-                      className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium ${
-                        summaryLength === 'medium' 
-                          ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Medium
-                    </button>
-                    <button 
-                      onClick={() => setSummaryLength('long')}
-                      className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium ${
-                        summaryLength === 'long' 
-                          ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Long
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="mb-4">
-                  <label className="flex items-center text-sm text-gray-700">
-                    <input 
-                      type="checkbox" 
-                      checked={selectedTextOnly}
-                      onChange={(e) => setSelectedTextOnly(e.target.checked)}
-                      className="mr-2 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    Analyze selected text only
-                  </label>
+              {/* Summary length selection */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Summary Length
+                </label>
+                <div className="flex space-x-2">
+                  <button 
+                    onClick={() => setSummaryLength('short')}
+                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium ${
+                      summaryLength === 'short' 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Short
+                  </button>
+                  <button 
+                    onClick={() => setSummaryLength('medium')}
+                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium ${
+                      summaryLength === 'medium' 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Medium
+                  </button>
+                  <button 
+                    onClick={() => setSummaryLength('long')}
+                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium ${
+                      summaryLength === 'long' 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Long
+                  </button>
                 </div>
               </div>
               
-              {/* Analyze button */}
-              <button 
-                onClick={analyzePage}
-                disabled={isLoading}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg flex items-center justify-center transition-colors shadow-sm"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader size={18} className="animate-spin mr-2" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <BookOpen size={18} className="mr-2" />
-                    ANALYZE PAGE
-                  </>
-                )}
-              </button>
-
-              {/* Add PageAnalyzer here */}
+              {/* Selected text only checkbox */}
+              <div className="mb-4">
+                <label className="flex items-center text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={selectedTextOnly}
+                    onChange={(e) => setSelectedTextOnly(e.target.checked)}
+                    className="mr-2 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Analyze selected text only
+                </label>
+              </div>
+              
+              {/* Workspace Selection */}
               <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
                 <h3 className="font-medium text-gray-800 mb-3">Workspace Selection</h3>
-                <PageAnalyzer 
-                  settings={settings}
-                  onAnalysisComplete={handleAnalysisComplete}
+                <WorkspaceManager 
+                  onSelectWorkspace={setSelectedWorkspaceId}
+                  selectedWorkspaceId={selectedWorkspaceId}
+                  showCreateButton={false}
                 />
               </div>
             </div>
@@ -588,16 +605,37 @@ const App: React.FC = () => {
           )}
         </div>
         
+        {/* Move the analyze button to the bottom */}
+        {activeTab === 'analyze' && (
+          <button 
+            onClick={analyzePage}
+            disabled={isLoading}
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg flex items-center justify-center transition-colors mb-4"
+          >
+            {isLoading ? (
+              <>
+                <Loader size={18} className="animate-spin mr-2" />
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <BookOpen size={18} className="mr-2" />
+                ANALYZE PAGE
+              </>
+            )}
+          </button>
+        )}
+        
         {/* Support link */}
         <div className="px-5 py-3 mt-auto border-t border-gray-100 text-center">
           <a 
             href="https://www.buymeacoffee.com/smadgulkar" 
             target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-blue-600 hover:text-blue-800 flex items-center justify-center"
+            rel="noopener noreferrer" 
+            className="inline-flex items-center justify-center px-4 py-2 bg-[#5F7FFF] hover:bg-blue-600 text-white font-medium rounded-lg transition-colors"
           >
-            <span className="mr-1">📖</span>
-            Support this project
+            <span className="mr-2">🍕</span>
+            Buy me a pizza
           </a>
         </div>
       </div>
@@ -671,16 +709,7 @@ const App: React.FC = () => {
               </div>
               
               <div className="mt-5 pt-4 border-t border-gray-100 text-center">
-                <p className="text-sm text-gray-600 mb-2">If this extension helped you:</p>
-                <a 
-                  href="https://www.buymeacoffee.com/smadgulkar" 
-                  target="_blank"
-                  rel="noopener noreferrer" 
-                  className="inline-flex items-center justify-center px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-medium rounded-lg transition-colors"
-                >
-                  <span className="mr-2">📖</span>
-                  Buy me a book
-                </a>
+                <BuyMeButton />
               </div>
               
               <button

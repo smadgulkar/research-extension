@@ -1,64 +1,73 @@
-import React from 'react';
-import { FileText, Clock, Tag } from 'lucide-react';
+import React, { useState } from 'react';
 import { LLMService } from '@/services/llm';
+import type { Settings } from '@/storage/db';
 
 interface QuickSummaryProps {
   content: string;
   title: string;
-  onSummaryComplete: (summary: any) => void;
+  settings: Settings;
 }
 
-const QuickSummary: React.FC<QuickSummaryProps> = ({ content, title, onSummaryComplete }) => {
-  const [summary, setSummary] = React.useState<string>('');
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+const QuickSummary: React.FC<QuickSummaryProps> = ({ content, title, settings }) => {
+  const [summary, setSummary] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const generateQuickSummary = async () => {
-    setLoading(true);
+  const generateSummary = async () => {
+    setIsLoading(true);
     setError(null);
     
     try {
-      const llmService = new LLMService({
-        provider: 'anthropic',
-        model: 'claude-3-sonnet-20240229',
-        apiKey: 'your-api-key'
-      });
-
-      const result = await llmService.analyze(content, title);
-      setSummary(result.summary);
-      onSummaryComplete(result);
+      const llm = new LLMService(settings);
+      
+      // Create a prompt that includes both content and title
+      const prompt = `
+        Please provide a concise summary (3-4 sentences) of the following content:
+        
+        Title: ${title}
+        Content: ${content.substring(0, 3000)}...
+      `;
+      
+      // Now we only pass the prompt to the analyze method
+      const result = await llm.analyze(prompt);
+      setSummary(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate summary');
+      setError('Failed to generate summary. Please try again.');
+      console.error('Summary generation error:', err);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-mono text-lg font-medium text-gray-900">Quick Summary</h3>
+    <div className="bg-white rounded-lg shadow p-4">
+      <h3 className="text-lg font-medium mb-3">Quick Summary</h3>
+      
+      {!summary && !isLoading && (
         <button
-          onClick={generateQuickSummary}
-          disabled={loading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 
-            disabled:bg-blue-300 transition-colors font-mono text-sm"
+          onClick={generateSummary}
+          className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
         >
-          {loading ? 'Generating...' : 'Generate'}
+          Generate Summary
         </button>
-      </div>
-
+      )}
+      
+      {isLoading && (
+        <div className="text-center py-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Generating summary...</p>
+        </div>
+      )}
+      
       {error && (
-        <div className="text-error text-sm mb-3 font-mono">
+        <div className="text-red-500 mt-2">
           {error}
         </div>
       )}
-
+      
       {summary && (
         <div className="prose prose-sm max-w-none">
-          <p className="font-mono text-sm leading-relaxed text-gray-700">
-            {summary}
-          </p>
+          <p className="text-gray-700">{summary}</p>
         </div>
       )}
     </div>

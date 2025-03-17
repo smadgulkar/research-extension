@@ -46,6 +46,14 @@ module.exports = {
         { 
           from: 'src/styles',
           to: 'styles'
+        },
+        { 
+          from: 'src/icons/icon48.png',
+          to: 'icon48.png'
+        },
+        { 
+          from: 'src/icons/icon128.png',
+          to: 'icon128.png'
         }
       ],
     }),

@@ -35,15 +35,32 @@ export class KnowledgeService {
           },
           ...
         ]
+        
+        IMPORTANT: Make sure to provide a valid JSON array with all closing brackets.
       `;
-
-      const llm = new LLMService({
-        provider: 'openai', // Default to OpenAI for knowledge extraction
-        model: 'gpt-3.5-turbo', // Use a cheaper model for this task
-        apiKey: this.settings.apiKey
-      });
-
-      const knowledge = await llm.extractKnowledge(prompt);
+      
+      // Extract knowledge points
+      let knowledge = await this.llm.extractKnowledge(prompt);
+      
+      // Validate the knowledge structure
+      if (!Array.isArray(knowledge)) {
+        console.error('Invalid knowledge format, expected array but got:', typeof knowledge);
+        console.log('Knowledge content:', knowledge);
+        knowledge = [];
+      }
+      
+      // If knowledge extraction failed, try a simpler approach
+      if (knowledge.length === 0) {
+        console.log('Knowledge extraction failed, creating a default knowledge item');
+        
+        // Create a single knowledge item based on the page title and summary
+        knowledge = [{
+          topic: page.title,
+          content: page.summary || 'No summary available',
+          confidence: 0.7
+        }];
+      }
+      
       console.log('Extracted knowledge:', knowledge);
       
       // If no workspace is specified, use the default workspace
@@ -84,7 +101,7 @@ export class KnowledgeService {
       console.log('Knowledge stored successfully in workspace:', targetWorkspaceId);
     } catch (error) {
       console.error('Error processing page for knowledge:', error);
-      throw error; // Re-throw to allow caller to handle
+      throw error;
     }
   }
 

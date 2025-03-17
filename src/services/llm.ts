@@ -25,54 +25,30 @@ export class LLMService {
     this.settings = settings;
   }
 
-  async analyze(content: string, title: string, summaryLength: SummaryLength = 'medium'): Promise<AnalysisResult> {
-    const lengthInstructions = {
-      short: "Provide a very concise summary in 2-3 sentences.",
-      medium: "Provide a balanced summary in 4-6 sentences.",
-      long: "Provide a comprehensive summary in 7-10 sentences."
-    };
-    
-    const prompt = `
-      Analyze the following web content:
-      Title: ${title}
-      Content: ${content}
-      
-      Provide the following:
-      1. ${lengthInstructions[summaryLength]}
-      2. Extract 3-5 key points from the content.
-      3. Identify 3-7 relevant topics or categories.
-      4. Determine the overall sentiment (positive, negative, neutral, or mixed).
-      
-      Format your response as JSON:
-      {
-        "summary": "The summary of the content",
-        "keyPoints": ["Key point 1", "Key point 2", ...],
-        "topics": ["Topic 1", "Topic 2", ...],
-        "sentiment": "The overall sentiment"
-      }
-    `;
-
+  async analyze(prompt: string): Promise<any> {
     try {
+      // Check if API key is provided
+      if (!this.settings.apiKey) {
+        throw new Error('API key is required. Please add your API key in the settings.');
+      }
+
+      // Determine which provider to use
       switch (this.settings.provider.toLowerCase()) {
         case 'openai':
-          return this.openAIAnalyze(prompt);
+          return await this.callOpenAI(prompt);
         case 'anthropic':
-          return this.anthropicAnalyze(prompt);
+          return await this.callAnthropic(prompt);
         default:
           throw new Error(`Unsupported provider: ${this.settings.provider}`);
       }
     } catch (error) {
-      console.error('Analysis error:', error);
+      console.error('LLM analysis error:', error);
       throw error;
     }
   }
 
-  private async openAIAnalyze(prompt: string): Promise<AnalysisResult> {
+  private async callOpenAI(prompt: string): Promise<any> {
     try {
-      if (!this.settings.apiKey) {
-        throw new Error('OpenAI API key is missing. Please add it in settings.');
-      }
-
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -80,211 +56,156 @@ export class LLMService {
           'Authorization': `Bearer ${this.settings.apiKey}`
         },
         body: JSON.stringify({
-          model: this.settings.model,
-          messages: [{
-            role: 'system',
-            content: 'You are a research assistant that analyzes web content and provides structured insights.'
-          }, {
-            role: 'user',
-            content: prompt
-          }],
-          response_format: { type: "json_object" }
+          model: this.settings.model || 'gpt-3.5-turbo',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful assistant that analyzes web content.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.3
         })
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(`OpenAI API error: ${error.error?.message || response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`);
       }
 
       const data = await response.json();
-      return JSON.parse(data.choices[0].message.content);
+      return data.choices[0].message.content;
     } catch (error) {
-      console.error('OpenAI analysis error:', error);
+      console.error('OpenAI API error:', error);
       throw error;
     }
   }
 
-  private async anthropicAnalyze(prompt: string): Promise<AnalysisResult> {
+  private async callAnthropic(prompt: string): Promise<any> {
     try {
-      if (!this.settings.apiKey) {
-        throw new Error('Anthropic API key is missing. Please add it in settings.');
-      }
-
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': this.settings.apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
+          'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
-          model: this.settings.model,
-          max_tokens: 2000,
-          messages: [{
-            role: 'user',
-            content: `${prompt}\n\nRespond only with valid JSON matching the specified structure.`
-          }]
+          model: this.settings.model || 'claude-2',
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 1000
         })
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(`Anthropic API error: ${error.error?.message || response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(`Anthropic API error: ${errorData.error?.message || response.statusText}`);
       }
 
       const data = await response.json();
-      return JSON.parse(data.content[0].text);
+      return data.content[0].text;
     } catch (error) {
-      console.error('Anthropic analysis error:', error);
+      console.error('Anthropic API error:', error);
       throw error;
     }
   }
 
-  async extractKnowledge(prompt: string): Promise<KnowledgePoint[]> {
-    const structuredPrompt = `
-      Analyze the following content and extract key knowledge points:
-      ${prompt}
-
-      For each knowledge point:
-      1. Identify the specific topic it belongs to
-      2. Write a clear, concise statement of the knowledge
-      3. Assign a confidence score (0.0-1.0) based on how clearly/directly this knowledge is stated
-
-      Format your response as a JSON array of knowledge points:
-      [
-        {
-          "topic": "specific topic area",
-          "content": "clear knowledge statement",
-          "confidence": 0.95
+  async extractKnowledge(prompt: string): Promise<any> {
+    const response = await this.analyze(prompt);
+    try {
+      // Handle case where response is wrapped in markdown code blocks
+      let jsonStr = response;
+      
+      // Remove markdown code block formatting if present
+      if (response.includes('```json')) {
+        // More careful extraction of JSON content
+        const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+          jsonStr = jsonMatch[1];
+        } else {
+          // Fallback to simple replacement
+          jsonStr = response.replace(/```json\s*|\s*```/g, '');
         }
-      ]
-
-      Ensure each knowledge point is:
-      - Self-contained and meaningful on its own
-      - Specific rather than general
-      - Factual rather than subjective
-      - Properly categorized by topic
-    `;
-
-    const response = await this.makeAPIRequest(structuredPrompt);
-    try {
-      const parsed = JSON.parse(response);
-      return Array.isArray(parsed) ? parsed : [];
+      } else if (response.includes('```')) {
+        // More careful extraction for generic code blocks
+        const jsonMatch = response.match(/```\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+          jsonStr = jsonMatch[1];
+        } else {
+          // Fallback to simple replacement
+          jsonStr = response.replace(/```\s*|\s*```/g, '');
+        }
+      }
+      
+      // Trim whitespace
+      jsonStr = jsonStr.trim();
+      
+      // Make sure the JSON is complete and valid
+      // Check if it starts with [ and ends with ]
+      if (jsonStr.startsWith('[') && !jsonStr.endsWith(']')) {
+        // Find the last closing bracket
+        const lastIndex = jsonStr.lastIndexOf(']');
+        if (lastIndex > 0) {
+          jsonStr = jsonStr.substring(0, lastIndex + 1);
+        }
+      }
+      
+      console.log('Cleaned JSON string:', jsonStr);
+      
+      // Try to parse the JSON
+      try {
+        return JSON.parse(jsonStr);
+      } catch (parseError) {
+        console.error('Initial parsing failed, trying to fix JSON:', parseError);
+        
+        // Try to fix common JSON issues
+        // 1. Missing closing bracket
+        if (jsonStr.startsWith('[') && !jsonStr.endsWith(']')) {
+          jsonStr += ']';
+        }
+        
+        // 2. Trailing comma
+        jsonStr = jsonStr.replace(/,(\s*[\]}])/g, '$1');
+        
+        console.log('Fixed JSON string:', jsonStr);
+        return JSON.parse(jsonStr);
+      }
     } catch (error) {
-      console.error('Error parsing knowledge points:', error);
+      console.error('Error parsing knowledge extraction response:', error);
+      console.error('Raw response:', response);
       return [];
     }
   }
 
-  async findRelevantKnowledge(query: string, knowledge: Knowledge[]): Promise<Knowledge[]> {
+  async findRelevantKnowledge(query: string, knowledgeItems: any[]): Promise<any[]> {
+    // Simple implementation for now
+    return knowledgeItems.slice(0, 5);
+  }
+
+  async synthesizeAnswer(query: string, relevantKnowledge: any[]): Promise<string> {
+    if (relevantKnowledge.length === 0) {
+      return "I don't have enough information to answer that question.";
+    }
+
+    const knowledgeText = relevantKnowledge
+      .map(item => `${item.topic}: ${item.content}`)
+      .join('\n\n');
+
     const prompt = `
-      Query: "${query}"
+      Based on the following knowledge:
+      ${knowledgeText}
       
-      Task: Find the most relevant pieces of knowledge from the following collection.
-      Consider:
-      1. Direct relevance to the query topic
-      2. Supporting or related information
-      3. Context that helps understand the query better
-
-      Knowledge Collection:
-      ${JSON.stringify(knowledge, null, 2)}
-
-      Return a JSON array of indices of the most relevant pieces, ordered by relevance (most relevant first).
-      Example: [2, 5, 1] means knowledge pieces at indices 2, 5, and 1 are most relevant in that order.
+      Please answer this question: ${query}
     `;
 
-    const response = await this.makeAPIRequest(prompt);
-    try {
-      const indices = JSON.parse(response);
-      if (!Array.isArray(indices)) throw new Error('Expected array of indices');
-      return indices
-        .map((i: number) => knowledge[i])
-        .filter((k): k is Knowledge => k !== undefined);
-    } catch (error) {
-      console.error('Error finding relevant knowledge:', error);
-      return [];
-    }
-  }
-
-  async synthesizeAnswer(query: string, relevantKnowledge: Knowledge[]): Promise<string> {
-    const prompt = `
-      Query: "${query}"
-
-      Using ONLY the following knowledge pieces, synthesize a comprehensive answer:
-      ${JSON.stringify(relevantKnowledge, null, 2)}
-
-      Guidelines:
-      1. Focus on directly answering the query
-      2. Integrate information from multiple knowledge pieces when relevant
-      3. Maintain accuracy - only state what is supported by the knowledge pieces
-      4. Use clear, concise language
-      5. If the knowledge is insufficient, acknowledge limitations
-      
-      Format: Provide a natural, flowing response that a human would find helpful and easy to understand.
-    `;
-
-    return this.makeAPIRequest(prompt);
-  }
-
-  private async makeAPIRequest(prompt: string): Promise<string> {
-    switch (this.settings.provider) {
-      case 'openai':
-        return this.openAIRequest(prompt);
-      case 'anthropic':
-        return this.anthropicRequest(prompt);
-      default:
-        throw new Error('Unsupported provider');
-    }
-  }
-
-  private async openAIRequest(prompt: string): Promise<string> {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.settings.apiKey}`
-      },
-      body: JSON.stringify({
-        model: this.settings.model,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.choices[0].message.content;
-  }
-
-  private async anthropicRequest(prompt: string): Promise<string> {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.settings.apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: this.settings.model,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Anthropic API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.content[0].text;
+    return await this.analyze(prompt);
   }
 }

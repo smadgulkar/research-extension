@@ -6,6 +6,7 @@ import type { Workspace } from '../../types/models';
 interface WorkspaceManagerProps {
   onSelectWorkspace: (workspaceId: number | null) => void;
   selectedWorkspaceId: number | null;
+  showCreateButton?: boolean;
 }
 
 const WORKSPACE_COLORS = [
@@ -19,7 +20,8 @@ const WORKSPACE_COLORS = [
 
 const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({ 
   onSelectWorkspace, 
-  selectedWorkspaceId 
+  selectedWorkspaceId,
+  showCreateButton = true
 }) => {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [isCreating, setIsCreating] = useState(false);
@@ -277,18 +279,20 @@ const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
           )}
 
           {/* New Workspace Button */}
-          <button 
-            onClick={() => {
-              setIsCreating(true);
-              setNewWorkspaceName('');
-              setNewWorkspaceDesc('');
-              setSelectedColor(WORKSPACE_COLORS[0]);
-            }}
-            className="w-full mb-3 py-2 bg-blue-50 text-blue-700 rounded-lg flex items-center justify-center hover:bg-blue-100 transition-colors"
-          >
-            <Plus size={16} className="mr-1" />
-            New Workspace
-          </button>
+          {showCreateButton && (
+            <button 
+              onClick={() => {
+                setIsCreating(true);
+                setNewWorkspaceName('');
+                setNewWorkspaceDesc('');
+                setSelectedColor(WORKSPACE_COLORS[0]);
+              }}
+              className="w-full mb-3 py-2 bg-blue-50 text-blue-700 rounded-lg flex items-center justify-center hover:bg-blue-100 transition-colors"
+            >
+              <Plus size={16} className="mr-1" />
+              New Workspace
+            </button>
+          )}
 
           {/* Workspace List */}
           <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
