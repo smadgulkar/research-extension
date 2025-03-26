@@ -1,0 +1,74 @@
+Chrome Extension Permissions Justification
+
+storage Permission
+Critical for Core Application State and User Data Management
+
+This permission is essential for:
+1. User Settings & Configuration
+   - Storing API keys securely for AI service integration
+   - Persisting user preferences (model selection, summary length)
+   - Maintaining workspace configurations and settings
+
+2. Knowledge Base Management
+   - Storing analyzed page data in IndexedDB
+   - Maintaining user's research history
+   - Saving extracted knowledge and insights
+   - Managing workspace organization and hierarchies
+
+3. Application State
+   - Caching analysis results for performance
+   - Maintaining session continuity
+   - Supporting offline functionality
+
+Without this permission, the extension would lose all user data between sessions, making it impossible to provide our core research assistant functionality.
+
+scripting Permission
+Essential for Content Analysis and Page Interaction
+
+This permission is required for:
+1. Page Content Extraction
+   - Accessing and analyzing webpage content
+   - Extracting relevant text and metadata
+   - Identifying main content areas vs navigation/ads
+
+2. Dynamic Analysis
+   - Executing content analysis scripts
+   - Processing page structure
+   - Gathering metadata (title, description, timestamps)
+
+3. User Experience
+   - Supporting selected text analysis
+   - Enabling interactive page elements
+   - Providing real-time content processing
+
+The scripting permission is fundamental to our ability to analyze web content and provide meaningful insights to users.
+
+activeTab Permission
+Required for Secure and Focused Page Access
+
+This permission is crucial for:
+1. Current Page Analysis
+   - Accessing content of the active tab only when needed
+   - Reading page metadata and content securely
+   - Supporting user-initiated analysis
+
+2. Privacy and Security
+   - Limiting access to only the current tab
+   - Ensuring user consent through explicit actions
+   - Protecting user privacy by avoiding broad URL permissions
+
+3. User Control
+   - Enabling analysis only when user activates extension
+   - Supporting selective content analysis
+   - Maintaining transparency in page access
+
+The activeTab permission represents our commitment to privacy-focused design, requesting access only when necessary and only to the current tab being analyzed.
+
+Impact on Functionality
+Without these permissions, the extension would:
+- Lose all user settings and analyzed content between sessions
+- Be unable to process webpage content
+- Fail to provide its core research and analysis features
+- Not maintain user workspaces and knowledge base
+
+These permissions are minimal and necessary for delivering the core functionality of our research assistant while maintaining user privacy and security. 
