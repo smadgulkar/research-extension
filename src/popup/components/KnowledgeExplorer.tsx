@@ -1,8 +1,8 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Search, Book, ArrowRight, ThumbsUp, ThumbsDown, Info, Database, Brain, X, Tag, Clock, Loader, Folder } from 'lucide-react';
+import { Search, Book, ArrowRight, ThumbsUp, ThumbsDown, Info, Database, Brain, X, Tag, Clock, Loader, Folder, Plus, FolderOpen, Trash2 } from 'lucide-react';
 import { db } from '@/storage/db';
 import { KnowledgeService } from '@/services/knowledgeService';
-import type { Knowledge } from '@/storage/db';
+import type { Knowledge, Workspace } from '@/types/models';
 import KnowledgeGuide from './KnowledgeGuide';
 import WorkspaceManager from './WorkspaceManager';
 
@@ -28,9 +28,13 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
     const [newTag, setNewTag] = useState('');
     const [editingTagsFor, setEditingTagsFor] = useState<number | null>(null);
     const [selectedWorkspace, setSelectedWorkspace] = useState<number | null>(null);
+    const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
+    const [newWorkspaceName, setNewWorkspaceName] = useState('');
+    const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
 
     useEffect(() => {
       loadKnowledgeBase();
+      loadWorkspaces();
     }, [selectedWorkspace]);
 
     const loadKnowledgeBase = async () => {
@@ -86,12 +90,27 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
       setIsSearching(true);
       try {
         const knowledgeService = new KnowledgeService(settings);
-        const result = await knowledgeService.queryKnowledge(query, selectedWorkspace);
         
+        // First get all knowledge items based on workspace
+        let knowledgeItems;
+        if (selectedWorkspace === null) {
+          knowledgeItems = await db.knowledge.toArray();
+        } else {
+          knowledgeItems = await db.knowledge.where('workspaceId').equals(selectedWorkspace).toArray();
+        }
+        
+        if (knowledgeItems.length === 0) {
+          setKnowledgeItems([]);
+          setAnswer("No knowledge items found in this workspace. Try analyzing some pages first.");
+          return;
+        }
+        
+        const result = await knowledgeService.queryKnowledge(query, knowledgeItems);
         setKnowledgeItems(result.relevantKnowledge);
         setAnswer(result.synthesizedAnswer);
       } catch (error) {
         console.error('Knowledge search error:', error);
+        setAnswer("An error occurred while searching. Please try again.");
       } finally {
         setIsSearching(false);
       }
@@ -123,6 +142,81 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
       await loadKnowledgeBase(); // Refresh the knowledge items
     };
 
+    const loadWorkspaces = async () => {
+      try {
+        const workspaces = await db.workspaces.toArray();
+        setWorkspaces(workspaces);
+      } catch (error) {
+        console.error('Error loading workspaces:', error);
+      }
+    };
+
+    const createWorkspace = async () => {
+      if (!newWorkspaceName.trim()) return;
+      
+      try {
+        await db.workspaces.add({
+          name: newWorkspaceName.trim(),
+          description: '',
+          color: '#4299E1',
+          createdAt: new Date(),
+          lastAccessed: new Date()
+        });
+        
+        setNewWorkspaceName('');
+        loadWorkspaces();
+      } catch (error) {
+        console.error('Error creating workspace:', error);
+      }
+    };
+
+    const deleteWorkspace = async (id: number) => {
+      if (!confirm('Move all items to Default workspace and delete this workspace?')) return;
+      
+      try {
+        // Get default workspace
+        const defaultWorkspace = await db.workspaces.where('name').equals('Default').first();
+        if (!defaultWorkspace?.id) {
+          throw new Error('Default workspace not found');
+        }
+        
+        // Move items to default workspace
+        await db.knowledge.where('workspaceId').equals(id).modify({
+          workspaceId: defaultWorkspace.id
+        });
+        
+        // Delete workspace
+        await db.workspaces.delete(id);
+        
+        // If current workspace was deleted, switch to default
+        if (selectedWorkspace === id) {
+          setSelectedWorkspace(defaultWorkspace.id);
+        }
+        
+        loadWorkspaces();
+      } catch (error) {
+        console.error('Error deleting workspace:', error);
+      }
+    };
+
+    const deleteKnowledgeItem = async (itemId: number) => {
+      if (!confirm('Are you sure you want to delete this knowledge item?')) {
+        return;
+      }
+      
+      try {
+        await db.knowledge.delete(itemId);
+        // Refresh the knowledge items
+        if (query.trim()) {
+          await searchKnowledge(); // If there's a search query, refresh search results
+        } else {
+          await loadKnowledgeBase(); // Otherwise refresh the regular view
+        }
+      } catch (error) {
+        console.error('Error deleting knowledge item:', error);
+      }
+    };
+
     // Expose methods to parent components
     useImperativeHandle(ref, () => ({
       reloadKnowledgeBase: () => {
@@ -134,230 +228,192 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
     }));
 
     return (
-      <div className="space-y-6">
-        {/* Workspace Manager */}
-        <WorkspaceManager 
-          onSelectWorkspace={setSelectedWorkspace}
-          selectedWorkspaceId={selectedWorkspace}
-        />
+      <div className="flex flex-col h-full">
+        {/* Workspace Selector */}
+        <div className="p-4 border-b">
+          <div className="flex items-center justify-between mb-2">
+            <select
+              value={selectedWorkspace || ''}
+              onChange={(e) => setSelectedWorkspace(e.target.value ? Number(e.target.value) : null)}
+              className="flex-1 p-2 border rounded-lg mr-2 text-sm"
+            >
+              <option value="">All Workspaces</option>
+              {workspaces.map(workspace => (
+                <option key={workspace.id} value={workspace.id}>
+                  {workspace.name}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setShowWorkspaceModal(true)}
+              className="p-2 text-gray-600 hover:text-blue-600 rounded-lg hover:bg-gray-100"
+              title="Manage Workspaces"
+            >
+              <Plus size={20} />
+            </button>
+          </div>
+        </div>
 
-        {/* Knowledge Base Info */}
-        {showInfo && (
-          <div className="enhanced-card bg-blue-50 border-l-4 border-blue-500">
-            <div className="flex justify-between items-start">
-              <div className="flex items-start">
-                <Info size={20} className="text-blue-500 mt-1 mr-3 flex-shrink-0" />
-                <div>
-                  <h3 className="font-medium text-blue-800 mb-2">About Knowledge Base</h3>
-                  <p className="text-sm text-blue-800 mb-2">
-                    The Knowledge Base automatically extracts and stores key information from your analyzed pages.
-                  </p>
-                  <ul className="text-sm text-blue-800 list-disc pl-5 mb-2">
-                    <li>Search for specific topics or ask questions</li>
-                    <li>Browse extracted knowledge by topic</li>
-                    <li>Build a personal research database over time</li>
-                  </ul>
-                </div>
-              </div>
-              <button 
-                onClick={() => setShowInfo(false)}
-                className="text-blue-500 hover:text-blue-700"
+        {/* Search and Q&A Interface */}
+        <div className="mb-4 space-y-4">
+          <div className="flex flex-col space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Search Knowledge Base or Ask a Question
+            </label>
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search or ask a question..."
+                className="flex-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    searchKnowledge();
+                  }
+                }}
+              />
+              <button
+                onClick={searchKnowledge}
+                disabled={isSearching}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 
+                         disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
               >
-                <X size={16} />
+                {isSearching ? (
+                  <>
+                    <Loader size={16} className="animate-spin mr-2" />
+                    Searching...
+                  </>
+                ) : (
+                  'Search'
+                )}
               </button>
             </div>
           </div>
-        )}
-        
-        {/* Search Section */}
-        <div className="enhanced-card p-4">
-          <div className="relative">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask a question or search your knowledge base..."
-              className="w-full p-3 pl-10 pr-24 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-500 transition-all"
-            />
-            <Search size={18} className="absolute left-3 top-3.5 text-gray-400" />
-            <button
-              onClick={searchKnowledge}
-              disabled={isSearching || !query.trim()}
-              className="absolute right-2 top-2 px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-            >
-              {isSearching ? (
-                <div className="flex items-center">
-                  <Loader size={14} className="animate-spin mr-1" />
-                  <span>Searching...</span>
-                </div>
-              ) : (
-                "Search"
-              )}
-            </button>
-          </div>
-          
-          {topTopics.length > 0 && (
-            <div className="mt-3">
-              <div className="text-sm text-gray-600 mb-2 flex items-center">
-                <Tag size={14} className="mr-1" />
-                Popular Topics:
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {topTopics.map(({ topic, count }) => (
-                  <button
-                    key={topic}
-                    onClick={() => {
-                      setQuery(topic);
-                      searchKnowledge();
-                    }}
-                    className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs rounded-full flex items-center"
-                  >
-                    {topic}
-                    <span className="ml-1 bg-gray-200 text-gray-700 rounded-full px-1.5 text-xs">
-                      {count}
-                    </span>
-                  </button>
-                ))}
-              </div>
+
+          {/* Answer Display */}
+          {answer && (
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-medium text-blue-900 mb-2">Answer:</h3>
+              <p className="text-blue-800">{answer}</p>
             </div>
           )}
         </div>
-        
-        {/* Answer Section */}
-        {answer && (
-          <div className="dashboard-section">
-            <h2 className="mono-heading text-primary-dark mb-4 flex items-center">
-              <Brain size={18} className="mr-2" />
-              Answer
-            </h2>
-            <div className="enhanced-card bg-blue-50 border-l-4 border-blue-500">
-              <p className="mono-text leading-relaxed">{answer}</p>
-              <div className="flex justify-end mt-4 space-x-2">
-                <button className="p-2 rounded-full hover:bg-blue-100 transition-colors">
-                  <ThumbsUp size={16} className="text-primary" />
-                </button>
-                <button className="p-2 rounded-full hover:bg-red-100 transition-colors">
-                  <ThumbsDown size={16} className="text-red-500" />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Knowledge Items */}
-        <div className="dashboard-section">
-          <h2 className="mono-heading text-primary-dark mb-4 flex items-center">
-            <Book size={18} className="mr-2" />
-            Knowledge Items
-            {selectedWorkspace !== null && (
-              <span className="ml-2 text-sm text-gray-500">
-                in selected workspace
-              </span>
-            )}
-          </h2>
-          
-          {knowledgeItems.length > 0 ? (
-            <div className="space-y-4">
-              {knowledgeItems.map((item) => (
-                <div key={item.id} className="enhanced-card hover:bg-gray-50">
-                  <div className="flex items-start">
-                    <div className="bg-primary-light rounded-full p-2 mr-3 flex-shrink-0">
-                      <Book size={16} className="text-primary-dark" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium mono-heading text-primary-dark mb-2">{item.topic}</h3>
-                      <p className="mono-text text-sm mb-3 leading-relaxed">{item.content}</p>
-                      <div className="flex flex-wrap items-center text-xs text-gray-500">
-                        <span className="flex items-center mr-4">
-                          <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
-                          Confidence: {Math.round(item.confidence * 100)}%
-                        </span>
-                        <span className="flex items-center">
-                          <Clock size={12} className="mr-1" />
-                          {new Date(item.lastUpdated).toLocaleDateString()}
-                        </span>
-                        {item.tags && item.tags.length > 0 && (
-                          <div className="w-full mt-2 flex flex-wrap">
-                            {item.tags.map((tag, idx) => (
-                              <span key={idx} className="mr-2 mb-1 px-2 py-1 bg-gray-100 rounded-full text-xs flex items-center">
-                                {tag}
-                                <button 
-                                  onClick={() => removeTagFromKnowledge(item.id!, tag)}
-                                  className="ml-1 text-gray-500 hover:text-red-500"
-                                >
-                                  <X size={12} />
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  {editingTagsFor === item.id && (
-                    <div className="mt-2 flex">
-                      <input
-                        type="text"
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        placeholder="Add tag..."
-                        className="text-xs p-2 border rounded-l-lg flex-1"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            addTagToKnowledge(item.id!, newTag);
-                          }
-                        }}
-                      />
-                      <button
-                        onClick={() => addTagToKnowledge(item.id!, newTag)}
-                        className="text-xs bg-primary text-white px-3 py-1 rounded-r-lg"
-                      >
-                        Add
-                      </button>
-                    </div>
-                  )}
-                  {editingTagsFor !== item.id && (
-                    <button
-                      onClick={() => setEditingTagsFor(item.id!)}
-                      className="mt-2 text-xs text-primary flex items-center"
-                    >
-                      <Tag size={12} className="mr-1" />
-                      Manage Tags
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
+
+        {/* Knowledge Items Display */}
+        <div className="flex-1 overflow-y-auto">
+          {knowledgeItems.length === 0 ? (
+            // Empty State
             <div className="text-center py-8">
-              <div className="bg-blue-50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <Book size={24} className="text-blue-500" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-800 mb-2">Your Knowledge Base is Empty</h3>
-              <p className="text-gray-600 max-w-md mx-auto mb-4">
-                Analyze web pages to automatically extract and store knowledge in your personal database.
+              <Book size={32} className="mx-auto mb-4 text-gray-400" />
+              <h3 className="text-lg font-medium text-gray-800 mb-2">
+                Your Knowledge Base is Empty
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Start analyzing web pages to build your knowledge base.
               </p>
               <button 
                 onClick={() => window.parent.postMessage({ type: 'SWITCH_TAB', tab: 'analyze' }, '*')}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
-                Start Analyzing Pages
+                Analyze Your First Page
               </button>
             </div>
-          )}
-          {knowledgeItems.length === 0 && selectedWorkspace !== null && (
-            <div className="text-center py-6 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="text-gray-500 mb-2">
-                <Folder size={24} className="mx-auto mb-2" />
-                <p>This workspace is empty</p>
-              </div>
-              <p className="text-sm text-gray-600 max-w-md mx-auto">
-                Analyze pages and save knowledge to this workspace to see items here.
-              </p>
+          ) : (
+            <div className="space-y-4">
+              {knowledgeItems.map((item) => (
+                <div key={item.id} className="bg-white p-4 rounded-lg border relative group">
+                  {/* Delete button */}
+                  <button
+                    onClick={() => deleteKnowledgeItem(item.id!)}
+                    className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-600 
+                             opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Delete knowledge item"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+
+                  <h3 className="font-medium text-gray-800 mb-2">{item.topic}</h3>
+                  <p className="text-gray-600 mb-2">{item.content}</p>
+                  <div className="flex items-center justify-between text-sm text-gray-500">
+                    <span className="flex items-center">
+                      <Tag size={14} className="mr-1" />
+                      Confidence: {(item.confidence * 100).toFixed(0)}%
+                    </span>
+                    {item.workspaceId && (
+                      <span className="text-gray-400">
+                        {workspaces.find(w => w.id === item.workspaceId)?.name || 'Unknown Workspace'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
-        {showGuide && <KnowledgeGuide onClose={() => setShowGuide(false)} />}
+
+        {/* Simple Workspace Management Modal */}
+        {showWorkspaceModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl w-96 max-w-full">
+              <div className="p-4 border-b flex justify-between items-center">
+                <h3 className="font-medium">Manage Workspaces</h3>
+                <button 
+                  onClick={() => setShowWorkspaceModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              
+              <div className="p-4">
+                {/* Create New Workspace */}
+                <div className="mb-4">
+                  <div className="flex gap-2 mb-4">
+                    <input
+                      type="text"
+                      placeholder="New workspace name..."
+                      value={newWorkspaceName}
+                      onChange={(e) => setNewWorkspaceName(e.target.value)}
+                      className="flex-1 p-2 border rounded"
+                    />
+                    <button
+                      onClick={createWorkspace}
+                      disabled={!newWorkspaceName.trim()}
+                      className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      Create
+                    </button>
+                  </div>
+                </div>
+
+                {/* Workspace List */}
+                <div className="space-y-2">
+                  {workspaces.map(workspace => (
+                    <div 
+                      key={workspace.id}
+                      className="flex items-center justify-between p-2 hover:bg-gray-50 rounded"
+                    >
+                      <div className="flex items-center">
+                        <FolderOpen size={16} className="mr-2 text-gray-500" />
+                        <span>{workspace.name}</span>
+                      </div>
+                      {workspace.name !== 'Default' && (
+                        <button
+                          onClick={() => deleteWorkspace(workspace.id!)}
+                          className="text-red-500 hover:text-red-700 p-1"
+                          title="Delete workspace"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

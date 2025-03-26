@@ -5,7 +5,6 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import '@/styles/tailwind.css';
 import '@/styles/modern.css';
-import '@/styles/highlight.css';
 import App from './App';
 
 console.log('Imports completed');

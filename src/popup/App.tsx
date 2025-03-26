@@ -3,12 +3,11 @@ import { db } from '@/storage/db';
 import { LLMService } from '@/services/llm';
 import { Settings, History, Loader, X, BookOpen, Cog, Filter, 
          LucideIcon, Tag, Clock, Brain, Book, Folder } from 'lucide-react';
-import type { Settings as SettingsType, Highlight } from '@/storage/db';
+import type { Settings as SettingsType } from '@/storage/db';
 import type { Page, SummaryLength } from '@/types/models';
 import SummaryDisplay from './components/SummaryDisplay';
 import SearchBar from './components/SearchBar';
 import NoteEditor from './components/NoteEditor';
-import HighlightControls from './components/HighlightControls';
 import KnowledgeExplorer from './components/KnowledgeExplorer';
 import { ContentAnalyzer } from '@/services/contentAnalyzer';
 import { ModelService } from '@/services/modelService';
@@ -87,7 +86,6 @@ const App: React.FC = () => {
   const [availableModels, setAvailableModels] = useState<{id: string, name?: string}[]>([]);
   const [summaryLength, setSummaryLength] = useState<SummaryLength>('medium');
   const [selectedTextOnly, setSelectedTextOnly] = useState(false);
-  const [selectedText, setSelectedText] = useState('');
   const knowledgeExplorerRef = useRef<KnowledgeExplorerRef>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number | null>(null);
 
@@ -112,24 +110,6 @@ const App: React.FC = () => {
     initializeApp();
   }, []);
 
-  // Listen for text selection
-  useEffect(() => {
-    const handleMessage = (message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
-      if (message.type === 'TEXT_SELECTION_CHANGED') {
-        if (!message.text) {
-          return;
-        }
-      }
-      return true;
-    };
-
-    chrome.runtime.onMessage.addListener(handleMessage);
-
-    return () => {
-      chrome.runtime.onMessage.removeListener(handleMessage);
-    };
-  }, []);
-
   // Data loading functions
   const loadUniqueTopics = async () => {
     const pages = await db.pages.toArray();
@@ -143,9 +123,9 @@ const App: React.FC = () => {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) return;
-
       if (!tab.url || tab.url.startsWith('chrome://')) return;
 
+      // Execute content extraction directly without separate content script
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => {
@@ -362,23 +342,6 @@ const App: React.FC = () => {
     
     loadModels();
   }, [settings.apiKey, settings.provider]);
-
-  // Add function to get selected text
-  const getSelectedText = async (): Promise<string> => {
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id) return '';
-      
-      const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_SELECTED_TEXT' });
-      if (response && response.selectedText) {
-        setSelectedText(response.selectedText);
-        return response.selectedText;
-      }
-    } catch (error) {
-      console.error('Error getting selected text:', error);
-    }
-    return '';
-  };
 
   // When analysis is complete, refresh the knowledge base
   const handleAnalysisComplete = (page: Page) => {

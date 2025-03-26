@@ -8,9 +8,6 @@
     "storage",
     "scripting"
   ],
-  "host_permissions": [
-    "<all_urls>"
-  ],
   "action": {
     "default_popup": "popup.html"
   },
@@ -20,15 +17,22 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "exclude_matches": [
+        "*://*.chrome.google.com/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_end"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["styles/*", "dist/*"],
-      "matches": ["<all_urls>"]
+      "resources": ["dist/icons/*"],
+      "extension_ids": ["*"],
+      "matches": []
     }
   ]
 }

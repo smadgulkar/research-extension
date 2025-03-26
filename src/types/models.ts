@@ -5,17 +5,6 @@ export interface PageMetadata {
   timestamp: string;
 }
 
-
-export interface Highlight {
-  id?: string;
-  text: string;
-  url: string;
-  pageTitle: string;
-  color: string;
-  note?: string;
-  timestamp: Date;
-}
-
 export interface Page {
   id?: number;
   url: string;
@@ -51,7 +40,7 @@ export interface Workspace {
   description: string;
   color: string;
   createdAt: Date;
-  lastAccessed?: Date;
+  lastAccessed: Date;
 }
 
 export interface Settings {

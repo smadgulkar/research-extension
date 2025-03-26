@@ -25,21 +25,14 @@ export class LLMService {
     this.settings = settings;
   }
 
-  async analyze(prompt: string): Promise<any> {
+  async analyze(prompt: string): Promise<string> {
     try {
-      // Check if API key is provided
-      if (!this.settings.apiKey) {
-        throw new Error('API key is required. Please add your API key in the settings.');
-      }
-
-      // Determine which provider to use
-      switch (this.settings.provider.toLowerCase()) {
-        case 'openai':
-          return await this.callOpenAI(prompt);
-        case 'anthropic':
-          return await this.callAnthropic(prompt);
-        default:
-          throw new Error(`Unsupported provider: ${this.settings.provider}`);
+      if (this.settings.provider === 'openai') {
+        return await this.callOpenAI(prompt);
+      } else if (this.settings.provider === 'anthropic') {
+        return await this.callAnthropic(prompt);
+      } else {
+        throw new Error('Unsupported LLM provider');
       }
     } catch (error) {
       console.error('LLM analysis error:', error);
@@ -47,7 +40,7 @@ export class LLMService {
     }
   }
 
-  private async callOpenAI(prompt: string): Promise<any> {
+  private async callOpenAI(prompt: string): Promise<string> {
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -60,7 +53,7 @@ export class LLMService {
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful assistant that analyzes web content.'
+              content: 'You are a helpful assistant that provides accurate, detailed responses based on the given knowledge base.'
             },
             {
               role: 'user',
@@ -84,7 +77,7 @@ export class LLMService {
     }
   }
 
-  private async callAnthropic(prompt: string): Promise<any> {
+  private async callAnthropic(prompt: string): Promise<string> {
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -186,26 +179,111 @@ export class LLMService {
   }
 
   async findRelevantKnowledge(query: string, knowledgeItems: any[]): Promise<any[]> {
-    // Simple implementation for now
-    return knowledgeItems.slice(0, 5);
+    try {
+      if (!knowledgeItems || knowledgeItems.length === 0) {
+        return [];
+      }
+
+      const prompt = `
+        Given this query: "${query}"
+        
+        Find the most relevant items from this knowledge base:
+        ${JSON.stringify(knowledgeItems.map(item => ({
+          id: item.id,
+          topic: item.topic,
+          content: item.content,
+          confidence: item.confidence
+        })))}
+        
+        Return ONLY the relevant items as a JSON array, maintaining their original structure.
+        Include the id, topic, content, and confidence fields.
+        If an item is relevant, keep its original confidence score.
+        
+        Example format:
+        [
+          {
+            "id": 1,
+            "topic": "Machine Learning",
+            "content": "Machine learning is a subset of AI...",
+            "confidence": 0.95
+          }
+        ]
+        
+        IMPORTANT: Return valid JSON only, no additional text.
+      `;
+
+      const response = await this.analyze(prompt);
+      
+      // Clean the response to ensure it only contains the JSON part
+      const jsonStr = response.trim().replace(/^```json\s*|\s*```$/g, '');
+      
+      let relevantItems;
+      try {
+        relevantItems = JSON.parse(jsonStr);
+      } catch (e) {
+        console.error('Failed to parse LLM response:', e);
+        console.log('Raw response:', response);
+        // Return original items if parsing fails
+        return knowledgeItems;
+      }
+
+      if (!Array.isArray(relevantItems)) {
+        console.error('Invalid response format from LLM');
+        return knowledgeItems;
+      }
+
+      // Ensure all required fields are present
+      relevantItems = relevantItems.filter(item => 
+        item.topic && 
+        item.content && 
+        typeof item.confidence === 'number'
+      );
+
+      return relevantItems.length > 0 ? relevantItems : knowledgeItems;
+    } catch (error) {
+      console.error('Error finding relevant knowledge:', error);
+      // Return original items if there's an error
+      return knowledgeItems;
+    }
   }
 
   async synthesizeAnswer(query: string, relevantKnowledge: any[]): Promise<string> {
-    if (relevantKnowledge.length === 0) {
-      return "I don't have enough information to answer that question.";
-    }
+    try {
+      if (!relevantKnowledge || relevantKnowledge.length === 0) {
+        return "I don't have enough information to answer that question.";
+      }
 
-    const knowledgeText = relevantKnowledge
-      .map(item => `${item.topic}: ${item.content}`)
-      .join('\n\n');
+      const prompt = `
+        Based on the following knowledge items:
+        ${JSON.stringify(relevantKnowledge.map(item => ({
+          topic: item.topic,
+          content: item.content
+        })))}
+        
+        Please provide a comprehensive answer to this question: "${query}"
+        
+        Requirements:
+        1. Use ONLY the information provided above
+        2. Be specific and detailed in your response
+        3. If the information is insufficient, acknowledge the limitations
+        4. Format the response in clear, readable text
+        5. If multiple knowledge items are relevant, synthesize them coherently
+        
+        Response should be in natural language, not JSON format.
+      `;
 
-    const prompt = `
-      Based on the following knowledge:
-      ${knowledgeText}
+      const answer = await this.analyze(prompt);
       
-      Please answer this question: ${query}
-    `;
+      // Clean up the response
+      const cleanedAnswer = answer
+        .trim()
+        .replace(/^```.*\n?/, '') // Remove any markdown code block starts
+        .replace(/\n?```$/, '');   // Remove any markdown code block ends
 
-    return await this.analyze(prompt);
+      return cleanedAnswer || "Unable to generate an answer from the available knowledge.";
+    } catch (error) {
+      console.error('Error synthesizing answer:', error);
+      return "An error occurred while generating the answer. Please try again.";
+    }
   }
 }

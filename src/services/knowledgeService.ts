@@ -105,32 +105,35 @@ export class KnowledgeService {
     }
   }
 
-  async queryKnowledge(query: string, workspaceId: number | null = null): Promise<any> {
+  async queryKnowledge(query: string, knowledgeItems: Knowledge[]): Promise<any> {
     try {
-      // Get relevant knowledge items
-      let knowledgeItems;
-      
-      if (workspaceId === null) {
-        // Search across all workspaces
-        knowledgeItems = await db.knowledge.toArray();
-      } else {
-        // Search only in the selected workspace
-        knowledgeItems = await db.knowledge.where('workspaceId').equals(workspaceId).toArray();
+      if (!knowledgeItems || knowledgeItems.length === 0) {
+        return {
+          relevantKnowledge: [],
+          synthesizedAnswer: "No knowledge items found in the database. Try analyzing some pages first."
+        };
       }
-      
+
       // Find relevant knowledge points
       const relevantKnowledge = await this.llm.findRelevantKnowledge(query, knowledgeItems);
+
+      if (!relevantKnowledge || relevantKnowledge.length === 0) {
+        return {
+          relevantKnowledge: [],
+          synthesizedAnswer: "No relevant information found for your query."
+        };
+      }
 
       // Synthesize an answer
       const synthesizedAnswer = await this.llm.synthesizeAnswer(query, relevantKnowledge);
 
       return {
         relevantKnowledge,
-        synthesizedAnswer
+        synthesizedAnswer: synthesizedAnswer || "Unable to generate an answer from the available knowledge."
       };
     } catch (error) {
       console.error('Error querying knowledge:', error);
-      throw error;
+      throw new Error(`Failed to query knowledge: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 } 

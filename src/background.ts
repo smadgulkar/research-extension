@@ -36,6 +36,7 @@ console.log('Background script loaded');
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Background received message:', message);
   
+  // Remove all highlight-related message handling
   if (message.type === 'TEXT_SELECTION_CHANGED') {
     // Forward the message to the popup if it's open
     chrome.runtime.sendMessage(message).catch(() => {
@@ -48,33 +49,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.type) {
-    case 'SAVE_HIGHLIGHT':
-      db.highlights.add(request.highlight).then((id) => {
-        console.log('Highlight saved with ID:', id);
-        sendResponse({ success: true, id });
-      }).catch((error) => {
-        console.error('Error saving highlight:', error);
-        sendResponse({ success: false, error });
-      });
-      return true;
-
-    case 'GET_HIGHLIGHTS':
-      db.highlights.where('url').equals(sender.tab?.url || '').toArray().then(highlights => {
-        sendResponse({ highlights });
-      }).catch((error) => {
-        console.error('Error getting highlights:', error);
-        sendResponse({ success: false, error });
-      });
-      return true;
-
-    case 'REMOVE_HIGHLIGHT':
-      db.highlights.delete(request.highlightId).then(() => {
-        sendResponse({ success: true });
-      }).catch((error) => {
-        console.error('Error removing highlight:', error);
-        sendResponse({ success: false, error });
-      });
+    default:
       return true;
   }
-  return true;
 });

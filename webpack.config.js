@@ -6,7 +6,6 @@ module.exports = {
   devtool: 'source-map',
   entry: {
     popup: './src/popup/index.tsx',
-    content: './src/content.ts',
     background: './src/background.ts'
   },
   output: {
@@ -37,7 +36,16 @@ module.exports = {
       patterns: [
         { 
           from: 'public/manifest.json',
-          to: 'manifest.json'
+          to: 'manifest.json',
+          transform(content) {
+            const manifest = JSON.parse(content);
+            delete manifest.host_permissions;
+            delete manifest.content_scripts;
+            if (manifest.web_accessible_resources) {
+              manifest.web_accessible_resources[0].matches = [];
+            }
+            return JSON.stringify(manifest, null, 2);
+          }
         },
         { 
           from: 'public/popup.html',
