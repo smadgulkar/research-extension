@@ -247,4 +247,47 @@ class ExportService {
   }
 }
 
+// Obsidian URI handler
+export const openInObsidian = async (data: AnalysisData, vaultName?: string): Promise<void> => {
+  const isAvailable = await premiumService.isExportFormatAvailable('obsidian');
+  if (!isAvailable) {
+    throw new Error('Obsidian integration requires premium subscription');
+  }
+
+  const content = exportService.toObsidian(data);
+  const fileName = data.title.slice(0, 50).replace(/[^a-z0-9]/gi, '-');
+
+  // Build Obsidian URI
+  const params = new URLSearchParams();
+  if (vaultName) {
+    params.set('vault', vaultName);
+  }
+  params.set('file', `Research/${fileName}`);
+  params.set('content', content);
+
+  const uri = `obsidian://new?${params.toString()}`;
+
+  // Open Obsidian
+  window.open(uri, '_blank');
+};
+
+// Get list of Obsidian vaults (stored in settings)
+export const getObsidianVaults = async (): Promise<string[]> => {
+  try {
+    const result = await chrome.storage.local.get('obsidian_vaults');
+    return result.obsidian_vaults || [];
+  } catch {
+    return [];
+  }
+};
+
+// Save Obsidian vault name
+export const saveObsidianVault = async (vaultName: string): Promise<void> => {
+  const vaults = await getObsidianVaults();
+  if (!vaults.includes(vaultName)) {
+    vaults.push(vaultName);
+    await chrome.storage.local.set({ obsidian_vaults: vaults });
+  }
+};
+
 export const exportService = new ExportService();

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Copy, Download, Check, Share2, BookOpen, ChevronDown, Crown } from 'lucide-react';
-import { exportService } from '../../services/exportService';
+import { X, Copy, Download, Check, Share2, BookOpen, ChevronDown, Crown, FileText } from 'lucide-react';
+import { exportService, openInObsidian, getObsidianVaults, saveObsidianVault } from '../../services/exportService';
 import { premiumService } from '../../services/premiumService';
 import { PremiumBadge, UpgradePrompt } from './PremiumBadge';
 import type { ExportFormat } from '../../types/models';
@@ -94,6 +94,22 @@ const SummaryDisplay: React.FC<SummaryDisplayProps> = ({
 
   // Check if Web Share API is available
   const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
+
+  const handleOpenInObsidian = async () => {
+    if (!isPremium) {
+      setShowUpgradePrompt(true);
+      return;
+    }
+    try {
+      await openInObsidian(analysisData);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('premium')) {
+        setShowUpgradePrompt(true);
+      } else {
+        console.error('Obsidian open failed:', error);
+      }
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
@@ -229,6 +245,19 @@ const SummaryDisplay: React.FC<SummaryDisplayProps> = ({
                 Share
               </button>
             )}
+            <button
+              onClick={handleOpenInObsidian}
+              className={`flex items-center px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                isPremium
+                  ? 'bg-purple-100 hover:bg-purple-200 text-purple-700'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-500'
+              }`}
+              title={isPremium ? 'Open in Obsidian' : 'Premium feature'}
+            >
+              <FileText size={14} className="mr-1" />
+              Obsidian
+              {!isPremium && <Crown size={10} className="ml-1 text-amber-500" />}
+            </button>
           </div>
         </div>
         {showUpgradePrompt && (
