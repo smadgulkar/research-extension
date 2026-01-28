@@ -19,6 +19,7 @@ import { KnowledgeExplorerRef } from './components/KnowledgeExplorer';
 import BuyMeButton from './components/BuyMeButton';
 import FeedbackButton from '../components/FeedbackButton';
 import PremiumSettings from './components/PremiumSettings';
+import NotionSettings from './components/NotionSettings';
 import { premiumService } from '../services/premiumService';
 
 interface TabButtonProps {
@@ -92,7 +93,7 @@ const App: React.FC = () => {
   const knowledgeExplorerRef = useRef<KnowledgeExplorerRef>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number | null>(null);
   const [isPremium, setIsPremium] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'api' | 'premium'>('api');
+  const [settingsTab, setSettingsTab] = useState<'api' | 'premium' | 'integrations'>('api');
 
   // Initialize app data
   useEffect(() => {
@@ -661,6 +662,17 @@ const App: React.FC = () => {
                     </span>
                   )}
                 </button>
+                <button
+                  onClick={() => setSettingsTab('integrations')}
+                  className={`flex-1 py-3 px-4 text-sm font-medium flex items-center justify-center gap-2 ${
+                    settingsTab === 'integrations'
+                      ? 'text-blue-600 border-b-2 border-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Folder size={16} />
+                  Integrations
+                </button>
               </div>
 
               {settingsTab === 'api' ? (
@@ -730,10 +742,12 @@ const App: React.FC = () => {
                     Save Settings
                   </button>
                 </div>
-              ) : (
+              ) : settingsTab === 'premium' ? (
                 <PremiumSettings onClose={() => {
                   premiumService.isPremium().then(setIsPremium);
                 }} />
+              ) : (
+                <NotionSettings />
               )}
             </div>
           </div>

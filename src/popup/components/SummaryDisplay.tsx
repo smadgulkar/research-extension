@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Copy, Download, Check, Share2, BookOpen, ChevronDown, Crown, FileText } from 'lucide-react';
 import { exportService, openInObsidian, getObsidianVaults, saveObsidianVault } from '../../services/exportService';
 import { premiumService } from '../../services/premiumService';
+import { notionService } from '../../services/notionService';
 import { PremiumBadge, UpgradePrompt } from './PremiumBadge';
 import type { ExportFormat } from '../../types/models';
 
@@ -37,9 +38,12 @@ const SummaryDisplay: React.FC<SummaryDisplayProps> = ({
   const [showFormatDropdown, setShowFormatDropdown] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [notionConnected, setNotionConnected] = useState(false);
+  const [exportingToNotion, setExportingToNotion] = useState(false);
 
   useEffect(() => {
     premiumService.isPremium().then(setIsPremium);
+    notionService.isConnected().then(setNotionConnected);
   }, []);
 
   const analysisData = {
@@ -108,6 +112,32 @@ const SummaryDisplay: React.FC<SummaryDisplayProps> = ({
       } else {
         console.error('Obsidian open failed:', error);
       }
+    }
+  };
+
+  const handleExportToNotion = async () => {
+    if (!isPremium) {
+      setShowUpgradePrompt(true);
+      return;
+    }
+    if (!notionConnected) {
+      alert('Please connect to Notion in Settings > Integrations first');
+      return;
+    }
+    setExportingToNotion(true);
+    try {
+      const result = await notionService.exportToNotion(analysisData);
+      window.open(result.url, '_blank');
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message.includes('premium')) {
+          setShowUpgradePrompt(true);
+        } else {
+          alert(error.message);
+        }
+      }
+    } finally {
+      setExportingToNotion(false);
     }
   };
 
@@ -257,6 +287,26 @@ const SummaryDisplay: React.FC<SummaryDisplayProps> = ({
               <FileText size={14} className="mr-1" />
               Obsidian
               {!isPremium && <Crown size={10} className="ml-1 text-amber-500" />}
+            </button>
+            <button
+              onClick={handleExportToNotion}
+              disabled={exportingToNotion}
+              className={`flex items-center px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                isPremium && notionConnected
+                  ? 'bg-gray-800 hover:bg-black text-white'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-500'
+              }`}
+              title={!isPremium ? 'Premium feature' : !notionConnected ? 'Connect Notion in Settings' : 'Export to Notion'}
+            >
+              {exportingToNotion ? (
+                <>Exporting...</>
+              ) : (
+                <>
+                  <span className="mr-1 font-bold">N</span>
+                  Notion
+                  {!isPremium && <Crown size={10} className="ml-1 text-amber-500" />}
+                </>
+              )}
             </button>
           </div>
         </div>
