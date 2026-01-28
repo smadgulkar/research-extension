@@ -23,6 +23,13 @@ module.exports = {
         test: /\.css$/,
         use: ['style-loader', 'css-loader', 'postcss-loader'],
       },
+      {
+        test: /\.(ttf|woff|woff2)$/,
+        type: 'asset/resource',
+        generator: {
+          filename: 'fonts/[name][ext]'
+        }
+      }
     ],
   },
   resolve: {
@@ -62,6 +69,14 @@ module.exports = {
         { 
           from: 'src/icons/icon128.png',
           to: 'icon128.png'
+        },
+        { 
+          from: path.resolve(__dirname, 'public/fonts'),
+          to: path.resolve(__dirname, 'dist/fonts')
+        },
+        { 
+          from: 'src/popup/error-handler.js',
+          to: 'error-handler.js'
         }
       ],
     }),

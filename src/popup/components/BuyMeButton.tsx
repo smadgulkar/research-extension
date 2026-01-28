@@ -1,32 +1,39 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
+import '../../styles/components/BuyMeButton.css';
 
 const BuyMeButton: React.FC = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  
-  useEffect(() => {
-    if (containerRef.current) {
-      // Clear any existing content
-      containerRef.current.innerHTML = '';
-      
-      // Create script element
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js';
-      script.setAttribute('data-name', 'bmc-button');
-      script.setAttribute('data-slug', 'smadgulkar');
-      script.setAttribute('data-color', '#5F7FFF');
-      script.setAttribute('data-emoji', '🍕');
-      script.setAttribute('data-font', 'Arial');
-      script.setAttribute('data-text', 'Buy me a pizza');
-      script.setAttribute('data-outline-color', '#000000');
-      script.setAttribute('data-font-color', '#ffffff');
-      script.setAttribute('data-coffee-color', '#FFDD00');
-      
-      // Append script to container
-      containerRef.current.appendChild(script);
-    }
-  }, []);
-  
-  return <div ref={containerRef} className="bmc-container"></div>;
+  // Configuration extracted from the original script attributes
+  const config = {
+    slug: 'smadgulkar',
+    buttonColor: '#5F7FFF',
+    emoji: '🍕',
+    font: 'Arial',
+    text: 'Buy me a pizza',
+    outlineColor: '#000000', // Used for border
+    fontColor: '#ffffff',
+    // coffeeColor: '#FFDD00', // This might be harder to replicate exactly without the script, often used for hover or internal icons.
+  };
+
+  const bmcUrl = `https://www.buymeacoffee.com/${config.slug}`;
+
+  return (
+    <a
+      href={bmcUrl}
+      target="_blank" // Open in a new tab
+      rel="noopener noreferrer" // Security best practice for target="_blank"
+      className="bmc-button"
+      style={{
+        backgroundColor: config.buttonColor,
+        color: config.fontColor,
+        borderColor: config.outlineColor, // Use outline color for border
+        fontFamily: config.font,
+      }}
+    >
+      {/* Optional: You could try adding an img tag here if you have a local coffee cup icon */}
+      <span className="bmc-emoji">{config.emoji}</span>
+      <span className="bmc-text">{config.text}</span>
+    </a>
+  );
 };
 
-export default BuyMeButton; 
+export default BuyMeButton;

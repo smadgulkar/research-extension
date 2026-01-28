@@ -5,7 +5,6 @@
   "description": "AI-powered research assistant",
   "permissions": [
     "activeTab",
-    "storage",
     "scripting"
   ],
   "action": {
@@ -30,7 +29,10 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["dist/icons/*"],
+      "resources": [
+        "dist/icons/*",
+        "fonts/*.ttf"
+      ],
       "extension_ids": ["*"],
       "matches": []
     }
