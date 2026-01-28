@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
-import { X, Copy, Download, Check, Share2, BookOpen } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Copy, Download, Check, Share2, BookOpen, ChevronDown, Crown } from 'lucide-react';
+import { exportService } from '../../services/exportService';
+import { premiumService } from '../../services/premiumService';
+import { PremiumBadge, UpgradePrompt } from './PremiumBadge';
+import type { ExportFormat } from '../../types/models';
 
 interface SummaryDisplayProps {
   summary: string;
@@ -10,6 +14,13 @@ interface SummaryDisplayProps {
   url: string;
   onClose: () => void;
 }
+
+const EXPORT_FORMATS: { value: ExportFormat; label: string; premium: boolean }[] = [
+  { value: 'markdown', label: 'Markdown', premium: false },
+  { value: 'json', label: 'JSON', premium: true },
+  { value: 'html', label: 'HTML', premium: true },
+  { value: 'obsidian', label: 'Obsidian', premium: true },
+];
 
 const SummaryDisplay: React.FC<SummaryDisplayProps> = ({
   summary,
@@ -22,47 +33,63 @@ const SummaryDisplay: React.FC<SummaryDisplayProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'summary' | 'keyPoints' | 'topics'>('summary');
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('markdown');
+  const [showFormatDropdown, setShowFormatDropdown] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
-  const handleCopy = async () => {
-    let textToCopy = '';
-    
-    if (activeTab === 'summary') {
-      textToCopy = `# ${title}\n\n${summary}\n\nSource: ${url}`;
-    } else if (activeTab === 'keyPoints') {
-      textToCopy = `# Key Points from ${title}\n\n${keyPoints.map(point => `• ${point}`).join('\n')}\n\nSource: ${url}`;
-    } else {
-      textToCopy = `# Topics from ${title}\n\n${topics.join(', ')}\n\nSentiment: ${sentiment}\n\nSource: ${url}`;
-    }
-    
-    await navigator.clipboard.writeText(textToCopy);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  useEffect(() => {
+    premiumService.isPremium().then(setIsPremium);
+  }, []);
+
+  const analysisData = {
+    title,
+    url,
+    summary,
+    keyPoints,
+    topics,
+    sentiment,
+    timestamp: new Date()
   };
 
-  const handleDownload = () => {
-    let content = '';
-    let filename = '';
-    
-    if (activeTab === 'summary') {
-      content = `# ${title}\n\n${summary}\n\nSource: ${url}`;
-      filename = 'summary.md';
-    } else if (activeTab === 'keyPoints') {
-      content = `# Key Points from ${title}\n\n${keyPoints.map(point => `• ${point}`).join('\n')}\n\nSource: ${url}`;
-      filename = 'key-points.md';
-    } else {
-      content = `# Topics from ${title}\n\n${topics.join(', ')}\n\nSentiment: ${sentiment}\n\nSource: ${url}`;
-      filename = 'topics.md';
+  const handleCopy = async () => {
+    try {
+      const content = await exportService.exportAnalysis(analysisData, exportFormat);
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('premium')) {
+        setShowUpgradePrompt(true);
+      } else {
+        console.error('Copy failed:', error);
+      }
     }
-    
-    const blob = new Blob([content], { type: 'text/markdown' });
-    const downloadUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(downloadUrl);
+  };
+
+  const handleDownload = async () => {
+    try {
+      const content = await exportService.exportAnalysis(analysisData, exportFormat);
+      const extension = exportService.getFileExtension(exportFormat);
+      const mimeType = exportService.getMimeType(exportFormat);
+      const filename = `${title.slice(0, 50).replace(/[^a-z0-9]/gi, '-')}-analysis.${extension}`;
+      exportService.downloadFile(content, filename, mimeType);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('premium')) {
+        setShowUpgradePrompt(true);
+      } else {
+        console.error('Download failed:', error);
+      }
+    }
+  };
+
+  const handleFormatSelect = (format: ExportFormat, isPremiumFormat: boolean) => {
+    if (isPremiumFormat && !isPremium) {
+      setShowUpgradePrompt(true);
+      return;
+    }
+    setExportFormat(format);
+    setShowFormatDropdown(false);
   };
 
   // Check if Web Share API is available
@@ -141,9 +168,36 @@ const SummaryDisplay: React.FC<SummaryDisplayProps> = ({
           )}
         </div>
         
-        <div className="px-4 py-3 border-t flex justify-between">
-          <div className="text-xs text-gray-500">
-            Analyzed with Research Assistant
+        <div className="px-4 py-3 border-t flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500">Export as:</span>
+            <div className="relative">
+              <button
+                onClick={() => setShowFormatDropdown(!showFormatDropdown)}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                {EXPORT_FORMATS.find(f => f.value === exportFormat)?.label}
+                <ChevronDown size={14} />
+              </button>
+              {showFormatDropdown && (
+                <div className="absolute bottom-full left-0 mb-1 bg-white border rounded-lg shadow-lg py-1 min-w-[140px] z-10">
+                  {EXPORT_FORMATS.map((format) => (
+                    <button
+                      key={format.value}
+                      onClick={() => handleFormatSelect(format.value, format.premium)}
+                      className={`w-full px-3 py-2 text-sm text-left hover:bg-gray-50 flex items-center justify-between ${
+                        exportFormat === format.value ? 'bg-gray-50 text-primary' : ''
+                      }`}
+                    >
+                      <span>{format.label}</span>
+                      {format.premium && !isPremium && (
+                        <Crown size={12} className="text-amber-500" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex space-x-2">
             <button
@@ -155,7 +209,7 @@ const SummaryDisplay: React.FC<SummaryDisplayProps> = ({
             </button>
             <button
               onClick={handleDownload}
-              className="flex items-center px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              className="flex items-center px-3 py-1.5 text-sm bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors"
             >
               <Download size={14} className="mr-1" />
               Download
@@ -177,6 +231,12 @@ const SummaryDisplay: React.FC<SummaryDisplayProps> = ({
             )}
           </div>
         </div>
+        {showUpgradePrompt && (
+          <UpgradePrompt
+            feature={`${EXPORT_FORMATS.find(f => f.value === exportFormat)?.label} export`}
+            onClose={() => setShowUpgradePrompt(false)}
+          />
+        )}
       </div>
     </div>
   );

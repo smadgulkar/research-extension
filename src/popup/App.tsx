@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '@/storage/db';
 import { LLMService } from '@/services/llm';
-import { Settings, History, Loader, X, BookOpen, Cog, Filter, 
-         LucideIcon, Tag, Clock, Brain, Book, Folder } from 'lucide-react';
+import { Settings, History, Loader, X, BookOpen, Cog, Filter,
+         LucideIcon, Tag, Clock, Brain, Book, Folder, Crown, Key } from 'lucide-react';
 import type { Settings as SettingsType } from '@/storage/db';
 import type { Page, SummaryLength } from '@/types/models';
 import SummaryDisplay from './components/SummaryDisplay';
@@ -18,6 +18,8 @@ import WorkspaceManager from './components/WorkspaceManager';
 import { KnowledgeExplorerRef } from './components/KnowledgeExplorer';
 import BuyMeButton from './components/BuyMeButton';
 import FeedbackButton from '../components/FeedbackButton';
+import PremiumSettings from './components/PremiumSettings';
+import { premiumService } from '../services/premiumService';
 
 interface TabButtonProps {
   id: string;
@@ -89,6 +91,8 @@ const App: React.FC = () => {
   const [selectedTextOnly, setSelectedTextOnly] = useState(false);
   const knowledgeExplorerRef = useRef<KnowledgeExplorerRef>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number | null>(null);
+  const [isPremium, setIsPremium] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'api' | 'premium'>('api');
 
   // Initialize app data
   useEffect(() => {
@@ -96,7 +100,11 @@ const App: React.FC = () => {
       try {
         // Initialize default workspace if it doesn't exist
         await initializeDefaultWorkspace();
-        
+
+        // Load premium status
+        const premiumStatus = await premiumService.isPremium();
+        setIsPremium(premiumStatus);
+
         await Promise.all([
           loadCurrentPage(),
           loadSettings(),
@@ -107,7 +115,7 @@ const App: React.FC = () => {
         console.error('Error during app initialization:', error);
       }
     };
-    
+
     initializeApp();
   }, []);
 
@@ -610,86 +618,123 @@ const App: React.FC = () => {
         {/* Settings Modal with improved design */}
         {showSettings && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl shadow-xl w-[400px] max-w-full overflow-hidden">
+            <div className="bg-white rounded-xl shadow-xl w-[420px] max-w-full overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center">
                 <h2 className="text-lg font-medium text-gray-800 flex items-center">
                   <Cog size={18} className="mr-2 text-blue-600" />
                   Settings
                 </h2>
-                <button 
+                <button
                   onClick={() => setShowSettings(false)}
                   className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <X size={16} />
                 </button>
               </div>
-              
-              <div className="p-5 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Provider
-                  </label>
-                  <select
-                    value={settings.provider}
-                    onChange={(e) => handleProviderChange(e.target.value)}
-                    className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    API Key
-                  </label>
-                  <input
-                    type="password"
-                    value={settings.apiKey}
-                    onChange={(e) => setSettings({...settings, apiKey: e.target.value})}
-                    className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={`Enter your ${settings.provider} API key`}
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Model
-                  </label>
-                  <select
-                    value={settings.model}
-                    onChange={(e) => setSettings({...settings, model: e.target.value})}
-                    className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    {availableModels.length === 0 ? (
-                      <option value="" disabled>
-                        {settings.apiKey ? 'Loading models...' : 'Enter API key first'}
-                      </option>
-                    ) : (
-                      availableModels.map(model => (
-                        <option key={model.id} value={model.id}>
-                          {model.name || model.id}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-                
-                <div className="mt-5 pt-4 border-t border-gray-100 text-center">
-                  <BuyMeButton />
-                </div>
-                
+
+              {/* Settings Tabs */}
+              <div className="flex border-b border-gray-200">
                 <button
-                  onClick={async () => {
-                    await db.settings.put(settings);
-                    setShowSettings(false);
-                  }}
-                  className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg 
-                    hover:bg-blue-700 transition-colors font-medium mt-4 shadow-sm"
+                  onClick={() => setSettingsTab('api')}
+                  className={`flex-1 py-3 px-4 text-sm font-medium flex items-center justify-center gap-2 ${
+                    settingsTab === 'api'
+                      ? 'text-blue-600 border-b-2 border-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
                 >
-                  Save Settings
+                  <Key size={16} />
+                  API Settings
+                </button>
+                <button
+                  onClick={() => setSettingsTab('premium')}
+                  className={`flex-1 py-3 px-4 text-sm font-medium flex items-center justify-center gap-2 ${
+                    settingsTab === 'premium'
+                      ? 'text-blue-600 border-b-2 border-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Crown size={16} className={isPremium ? 'text-amber-500' : ''} />
+                  Premium
+                  {isPremium && (
+                    <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
+                      Active
+                    </span>
+                  )}
                 </button>
               </div>
+
+              {settingsTab === 'api' ? (
+                <div className="p-5 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Provider
+                    </label>
+                    <select
+                      value={settings.provider}
+                      onChange={(e) => handleProviderChange(e.target.value)}
+                      className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="openai">OpenAI</option>
+                      <option value="anthropic">Anthropic</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      API Key
+                    </label>
+                    <input
+                      type="password"
+                      value={settings.apiKey}
+                      onChange={(e) => setSettings({...settings, apiKey: e.target.value})}
+                      className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder={`Enter your ${settings.provider} API key`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Model
+                    </label>
+                    <select
+                      value={settings.model}
+                      onChange={(e) => setSettings({...settings, model: e.target.value})}
+                      className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      {availableModels.length === 0 ? (
+                        <option value="" disabled>
+                          {settings.apiKey ? 'Loading models...' : 'Enter API key first'}
+                        </option>
+                      ) : (
+                        availableModels.map(model => (
+                          <option key={model.id} value={model.id}>
+                            {model.name || model.id}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+
+                  <div className="mt-5 pt-4 border-t border-gray-100 text-center">
+                    <BuyMeButton />
+                  </div>
+
+                  <button
+                    onClick={async () => {
+                      await db.settings.put(settings);
+                      setShowSettings(false);
+                    }}
+                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg
+                      hover:bg-blue-700 transition-colors font-medium mt-4 shadow-sm"
+                  >
+                    Save Settings
+                  </button>
+                </div>
+              ) : (
+                <PremiumSettings onClose={() => {
+                  premiumService.isPremium().then(setIsPremium);
+                }} />
+              )}
             </div>
           </div>
         )}

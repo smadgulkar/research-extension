@@ -57,3 +57,19 @@ export interface LLMSettings {
 }
 
 export type SummaryLength = 'short' | 'medium' | 'long';
+
+export type ExportFormat = 'markdown' | 'json' | 'html' | 'notion' | 'obsidian';
+
+export interface PremiumStatus {
+  isPremium: boolean;
+  subscriptionId?: string;
+  email?: string;
+  expiresAt?: Date;
+  licenseKey?: string;
+}
+
+export interface ExportOptions {
+  format: ExportFormat;
+  includeMetadata: boolean;
+  includeTags: boolean;
+}
