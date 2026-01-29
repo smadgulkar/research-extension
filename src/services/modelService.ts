@@ -21,6 +21,8 @@ export class ModelService {
           return this.getOpenAIModels();
         case 'anthropic':
           return this.getAnthropicModels();
+        case 'gemini':
+          return this.getGeminiModels();
         default:
           throw new Error(`Unsupported provider: ${this.settings.provider}`);
       }
@@ -101,21 +103,67 @@ export class ModelService {
       .trim();
   }
   
+  private async getGeminiModels(): Promise<Model[]> {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${this.settings.apiKey}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      // Filter for generative models only
+      return data.models
+        .filter((model: any) =>
+          model.name.includes('gemini') &&
+          model.supportedGenerationMethods?.includes('generateContent')
+        )
+        .map((model: any) => ({
+          id: model.name.replace('models/', ''),
+          name: this.formatGeminiModelName(model.displayName || model.name),
+          description: model.description
+        }));
+    } catch (error) {
+      console.error('Error fetching Gemini models:', error);
+      return this.getFallbackModels();
+    }
+  }
+
+  private formatGeminiModelName(name: string): string {
+    return name
+      .replace('models/', '')
+      .replace('gemini-', 'Gemini ')
+      .replace('-', ' ')
+      .replace(/\b\w/g, l => l.toUpperCase());
+  }
+
   private getFallbackModels(): Model[] {
     // Fallback models if API calls fail
-    if (this.settings.provider.toLowerCase() === 'openai') {
-      return [
-        { id: 'gpt-4o', name: 'GPT-4o' },
-        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
-        { id: 'gpt-4', name: 'GPT-4' },
-        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
-      ];
-    } else {
-      return [
-        { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
-        { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
-        { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' }
-      ];
+    switch (this.settings.provider.toLowerCase()) {
+      case 'openai':
+        return [
+          { id: 'gpt-4o', name: 'GPT-4o' },
+          { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+          { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+          { id: 'gpt-4', name: 'GPT-4' }
+        ];
+      case 'anthropic':
+        return [
+          { id: 'claude-3-5-sonnet-latest', name: 'Claude 3.5 Sonnet' },
+          { id: 'claude-3-5-haiku-latest', name: 'Claude 3.5 Haiku' },
+          { id: 'claude-3-opus-latest', name: 'Claude 3 Opus' }
+        ];
+      case 'gemini':
+        return [
+          { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+          { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+          { id: 'gemini-1.5-flash-8b', name: 'Gemini 1.5 Flash 8B' }
+        ];
+      default:
+        return [];
     }
   }
 } 

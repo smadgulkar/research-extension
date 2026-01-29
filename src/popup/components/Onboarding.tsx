@@ -116,11 +116,15 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onOpenSettings }) =
             <ul className="text-sm text-gray-600 space-y-1">
               <li className="flex items-center gap-2">
                 <Check size={14} className="text-green-500" />
-                OpenAI (GPT-4, GPT-3.5)
+                OpenAI (GPT-4o, GPT-4)
               </li>
               <li className="flex items-center gap-2">
                 <Check size={14} className="text-green-500" />
-                Anthropic (Claude)
+                Anthropic (Claude 3.5)
+              </li>
+              <li className="flex items-center gap-2">
+                <Check size={14} className="text-green-500" />
+                Google (Gemini 1.5)
               </li>
             </ul>
           </div>

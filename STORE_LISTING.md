@@ -5,7 +5,7 @@
 
 ## Short Description (132 characters max)
 ```
-AI-powered research tool. Analyze any webpage, extract key insights, and build your personal knowledge base. Works with GPT & Claude.
+AI-powered research tool. Analyze any webpage, extract key insights, and build your personal knowledge base. Works with GPT, Claude & Gemini.
 ```
 
 ## Detailed Description

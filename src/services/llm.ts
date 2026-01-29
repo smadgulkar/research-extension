@@ -31,6 +31,8 @@ export class LLMService {
         return await this.callOpenAI(prompt);
       } else if (this.settings.provider === 'anthropic') {
         return await this.callAnthropic(prompt);
+      } else if (this.settings.provider === 'gemini') {
+        return await this.callGemini(prompt);
       } else {
         throw new Error('Unsupported LLM provider');
       }
@@ -49,7 +51,7 @@ export class LLMService {
           'Authorization': `Bearer ${this.settings.apiKey}`
         },
         body: JSON.stringify({
-          model: this.settings.model || 'gpt-3.5-turbo',
+          model: this.settings.model || 'gpt-4o-mini',
           messages: [
             {
               role: 'system',
@@ -87,7 +89,7 @@ export class LLMService {
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
-          model: this.settings.model || 'claude-2',
+          model: this.settings.model || 'claude-3-5-sonnet-latest',
           messages: [
             {
               role: 'user',
@@ -107,6 +109,47 @@ export class LLMService {
       return data.content[0].text;
     } catch (error) {
       console.error('Anthropic API error:', error);
+      throw error;
+    }
+  }
+
+  private async callGemini(prompt: string): Promise<string> {
+    try {
+      const model = this.settings.model || 'gemini-1.5-flash';
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.settings.apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: prompt
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 2048,
+            }
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Gemini API error: ${errorData.error?.message || response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.candidates[0].content.parts[0].text;
+    } catch (error) {
+      console.error('Gemini API error:', error);
       throw error;
     }
   }

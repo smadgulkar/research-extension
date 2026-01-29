@@ -16,7 +16,6 @@ import { migrateToWorkspaces } from '../migration';
 import PageAnalyzer from './components/PageAnalyzer';
 import WorkspaceManager from './components/WorkspaceManager';
 import { KnowledgeExplorerRef } from './components/KnowledgeExplorer';
-import BuyMeButton from './components/BuyMeButton';
 import FeedbackButton from '../components/FeedbackButton';
 import PremiumSettings from './components/PremiumSettings';
 import NotionSettings from './components/NotionSettings';
@@ -624,18 +623,8 @@ const App: React.FC = () => {
             </button>
           )}
           
-          {/* Update the support links section */}
-          <div className="px-5 py-3 mt-auto border-t border-gray-100 flex justify-center items-center gap-4">
-            <a 
-              href="https://www.buymeacoffee.com/smadgulkar" 
-              target="_blank"
-              rel="noopener noreferrer" 
-              className="inline-flex items-center justify-center px-4 py-2 bg-[#5F7FFF] hover:bg-blue-600 
-                        text-white font-medium rounded-lg transition-colors"
-            >
-              <span className="mr-2">🍕</span>
-              Buy me a pizza
-            </a>
+          {/* Footer */}
+          <div className="px-5 py-3 mt-auto border-t border-gray-100 flex justify-center items-center">
             <FeedbackButton />
           </div>
         </div>
@@ -712,6 +701,7 @@ const App: React.FC = () => {
                     >
                       <option value="openai">OpenAI</option>
                       <option value="anthropic">Anthropic</option>
+                      <option value="gemini">Google Gemini</option>
                     </select>
                   </div>
 
@@ -749,10 +739,6 @@ const App: React.FC = () => {
                         ))
                       )}
                     </select>
-                  </div>
-
-                  <div className="mt-5 pt-4 border-t border-gray-100 text-center">
-                    <BuyMeButton />
                   </div>
 
                   <button
