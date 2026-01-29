@@ -1,9 +1,11 @@
 const path = require('path');
 const CopyPlugin = require('copy-webpack-plugin');
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 module.exports = {
-  mode: 'development',
-  devtool: 'source-map',
+  mode: isProduction ? 'production' : 'development',
+  devtool: isProduction ? false : 'source-map',
   entry: {
     popup: './src/popup/index.tsx',
     background: './src/background.ts'
@@ -11,6 +13,7 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].js',
+    clean: true,
   },
   module: {
     rules: [
@@ -41,7 +44,7 @@ module.exports = {
   plugins: [
     new CopyPlugin({
       patterns: [
-        { 
+        {
           from: 'public/manifest.json',
           to: 'manifest.json',
           transform(content) {
@@ -54,31 +57,25 @@ module.exports = {
             return JSON.stringify(manifest, null, 2);
           }
         },
-        { 
-          from: 'public/popup.html',
-          to: 'popup.html'
-        },
-        { 
-          from: 'src/styles',
-          to: 'styles'
-        },
-        { 
-          from: 'src/icons/icon48.png',
-          to: 'icon48.png'
-        },
-        { 
-          from: 'src/icons/icon128.png',
-          to: 'icon128.png'
-        },
-        { 
-          from: path.resolve(__dirname, 'public/fonts'),
-          to: path.resolve(__dirname, 'dist/fonts')
-        },
-        { 
-          from: 'src/popup/error-handler.js',
-          to: 'error-handler.js'
-        }
+        { from: 'public/popup.html', to: 'popup.html' },
+        { from: 'src/styles', to: 'styles' },
+        { from: 'src/icons/icon48.png', to: 'icon48.png' },
+        { from: 'src/icons/icon128.png', to: 'icon128.png' },
+        { from: path.resolve(__dirname, 'public/fonts'), to: path.resolve(__dirname, 'dist/fonts') },
+        { from: 'src/popup/error-handler.js', to: 'error-handler.js' }
       ],
     }),
   ],
 };
+
+// Add bundle analyzer in analyze mode
+if (process.env.ANALYZE === 'true') {
+  const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
+  module.exports.plugins.push(
+    new BundleAnalyzerPlugin({
+      analyzerMode: 'static',
+      reportFilename: 'bundle-report.html',
+      openAnalyzer: true,
+    })
+  );
+}
