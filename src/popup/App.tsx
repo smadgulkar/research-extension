@@ -20,7 +20,10 @@ import BuyMeButton from './components/BuyMeButton';
 import FeedbackButton from '../components/FeedbackButton';
 import PremiumSettings from './components/PremiumSettings';
 import NotionSettings from './components/NotionSettings';
+import Onboarding from './components/Onboarding';
 import { premiumService } from '../services/premiumService';
+
+const ONBOARDING_KEY = 'research_assistant_onboarding_complete';
 
 interface TabButtonProps {
   id: string;
@@ -94,11 +97,18 @@ const App: React.FC = () => {
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number | null>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'api' | 'premium' | 'integrations'>('api');
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Initialize app data
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Check if onboarding is complete
+        const onboardingResult = await chrome.storage.local.get(ONBOARDING_KEY);
+        if (!onboardingResult[ONBOARDING_KEY]) {
+          setShowOnboarding(true);
+        }
+
         // Initialize default workspace if it doesn't exist
         await initializeDefaultWorkspace();
 
@@ -388,7 +398,21 @@ const App: React.FC = () => {
     }
   };
 
+  const handleOnboardingComplete = async () => {
+    await chrome.storage.local.set({ [ONBOARDING_KEY]: true });
+    setShowOnboarding(false);
+  };
+
   // Complete return block for App.tsx
+  if (showOnboarding) {
+    return (
+      <Onboarding
+        onComplete={handleOnboardingComplete}
+        onOpenSettings={() => setShowSettings(true)}
+      />
+    );
+  }
+
   return (
     <div className="relative h-full">
       <div className="w-full h-full bg-white overflow-auto">
