@@ -51,7 +51,7 @@ export class LLMService {
           'Authorization': `Bearer ${this.settings.apiKey}`
         },
         body: JSON.stringify({
-          model: this.settings.model || 'gpt-4o-mini',
+          model: this.settings.model || 'gpt-4o',
           messages: [
             {
               role: 'system',
@@ -89,7 +89,7 @@ export class LLMService {
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
-          model: this.settings.model || 'claude-3-5-sonnet-latest',
+          model: this.settings.model || 'claude-sonnet-4-20250514',
           messages: [
             {
               role: 'user',
@@ -115,7 +115,7 @@ export class LLMService {
 
   private async callGemini(prompt: string): Promise<string> {
     try {
-      const model = this.settings.model || 'gemini-1.5-flash';
+      const model = this.settings.model || 'gemini-2.0-flash';
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.settings.apiKey}`,
         {
