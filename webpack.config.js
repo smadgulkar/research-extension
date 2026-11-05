@@ -99,6 +99,7 @@ module.exports = {
         },
         { from: 'public/popup.html', to: 'popup.html' },
         { from: 'src/styles', to: 'styles' },
+        { from: 'src/icons/icon16.png', to: 'icon16.png' },
         { from: 'src/icons/icon48.png', to: 'icon48.png' },
         { from: 'src/icons/icon128.png', to: 'icon128.png' },
         { from: path.resolve(__dirname, 'public/fonts'), to: 'fonts' },

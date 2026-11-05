@@ -4,7 +4,7 @@
 
 Summarize any article, doc or paper with OpenAI GPT, Anthropic Claude or Google Gemini, using your own API key. Every analysis is saved to a searchable library in your browser and can be sent to Obsidian, Notion, Markdown, JSON or HTML. There are no servers, no accounts and no tracking.
 
-[Add to Chrome](CHROME_STORE_URL) · [Add to Firefox](https://addons.mozilla.org/firefox/addon/research-assistant@smadgulkar.github.io/) · [Website](https://smadgulkar.github.io/research-extension/)
+[Add to Chrome](https://chromewebstore.google.com/detail/research-assistant/idkghcjlmgaiodkjgfcfijjkdcoakanl) · [Add to Firefox](https://addons.mozilla.org/firefox/addon/research-assistant@smadgulkar.github.io/) · [Website](https://smadgulkar.github.io/research-extension/)
 
 ![Research Assistant summarizing an article](docs/screenshots/1-summary.png)
 

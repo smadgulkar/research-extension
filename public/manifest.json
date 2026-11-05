@@ -12,11 +12,17 @@
     "https://api.notion.com/*"
   ],
   "icons": {
+    "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
   },
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   },
   "background": {
     "service_worker": "background.js",
@@ -31,7 +37,9 @@
       "exclude_matches": [
         "*://*.chrome.google.com/*"
       ],
-      "js": ["content.js"],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_end"
     }
   ],
@@ -41,7 +49,9 @@
         "dist/icons/*",
         "fonts/*.ttf"
       ],
-      "extension_ids": ["*"],
+      "extension_ids": [
+        "*"
+      ],
       "matches": []
     }
   ]
