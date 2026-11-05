@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Type-check
+        run: npm run typecheck
+      - name: Build Chrome/Edge and Firefox
+        run: npm run build:all
+      - name: Lint Firefox build (Mozilla validator)
+        run: npm run lint:firefox
+      - name: E2E tests (headless Chrome, mocked AI providers)
+        run: npm run test:e2e
+      - name: Re-run failed E2E with popup console output
+        if: failure()
+        run: E2E_DEBUG=1 npx jest --runInBand tests/e2e

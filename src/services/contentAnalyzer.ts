@@ -10,6 +10,20 @@ interface AnalysisResult {
   readingTime?: number;
 }
 
+// Extract a JSON object from an LLM reply that may be fenced or surrounded by text.
+export function parseJsonObject(text: string): any {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  const candidate = (fenced ? fenced[1] : text).trim();
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    const start = candidate.indexOf('{');
+    const end = candidate.lastIndexOf('}');
+    if (start === -1 || end <= start) throw new Error('No JSON object found in model response');
+    return JSON.parse(candidate.slice(start, end + 1));
+  }
+}
+
 export class ContentAnalyzer {
   private llm: LLMService;
 
@@ -48,9 +62,9 @@ export class ContentAnalyzer {
       // Now we only pass the prompt to the analyze method
       const responseText = await this.llm.analyze(prompt);
       
-      // Parse the JSON response
+      // Parse the JSON response (models often wrap JSON in ```json fences or add prose)
       try {
-        const analysis = JSON.parse(responseText);
+        const analysis = parseJsonObject(responseText);
         return {
           summary: analysis.summary || '',
           keyPoints: analysis.keyPoints || [],

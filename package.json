@@ -3,12 +3,18 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "clean": "rimraf ./dist",
-    "build": "cross-env NODE_ENV=production npm run clean && webpack --mode production",
-    "dev": "cross-env NODE_ENV=development npm run clean && webpack --mode development --watch",
-    "test": "jest --runInBand",
-    "test:e2e": "npm run build && jest --runInBand tests/e2e",
-    "analyze": "cross-env NODE_ENV=production ANALYZE=true npm run clean && webpack --mode production"
+    "build": "cross-env NODE_ENV=production TARGET=chrome webpack --mode production",
+    "build:firefox": "cross-env NODE_ENV=production TARGET=firefox webpack --mode production",
+    "build:e2e": "cross-env NODE_ENV=production E2E=1 webpack --mode production",
+    "build:all": "npm run build && npm run build:firefox",
+    "dev": "cross-env NODE_ENV=development webpack --mode development --watch",
+    "typecheck": "tsc --noEmit -p .",
+    "lint:firefox": "web-ext lint --source-dir dist-firefox --warnings-as-errors=false",
+    "test": "npm run test:e2e",
+    "test:e2e": "npm run build:e2e && jest --runInBand tests/e2e",
+    "verify": "npm run typecheck && npm run build:all && npm run lint:firefox && npm run test:e2e",
+    "analyze": "cross-env NODE_ENV=production ANALYZE=true webpack --mode production",
+    "release": "node scripts/release.mjs"
   },
   "keywords": [],
   "author": "",
@@ -36,6 +42,7 @@
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
+    "chrome-webstore-upload-cli": "^4.0.2",
     "copy-webpack-plugin": "^11.0.0",
     "cross-env": "^7.0.3",
     "css-loader": "^7.1.2",
@@ -46,6 +53,7 @@
     "rimraf": "^5.0.1",
     "style-loader": "^4.0.0",
     "terser-webpack-plugin": "^5.3.16",
+    "web-ext": "^10.8.0",
     "webpack-bundle-analyzer": "^4.10.2"
   }
 }

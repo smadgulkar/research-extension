@@ -1,232 +1,300 @@
 /**
- * E2E Tests for Research Assistant Extension
- * Uses Puppeteer to test extension functionality
+ * E2E tests for Research Assistant.
  *
- * Run: npm test
+ * Runs the real extension in headless Chrome against a local fixture page.
+ * All AI provider APIs are mocked via request interception, so no API keys
+ * are needed and nothing leaves the machine.
+ *
+ * Uses the E2E build (dist-e2e), which adds host permissions for 127.0.0.1 and
+ * the provider APIs. That stands in for the activeTab grant a real user gets by
+ * clicking the toolbar icon. The E2E build is never packaged for release.
+ *
+ * Run: npm run test:e2e   (set HEADFUL=1 to watch)
  */
 
 const puppeteer = require('puppeteer');
+const http = require('http');
 const path = require('path');
 
-const EXTENSION_PATH = path.resolve(__dirname, '../../dist');
-const EXTENSION_ID = 'your-extension-id'; // Will be assigned after loading
+const EXTENSION_PATH = path.resolve(__dirname, '../../dist-e2e');
+const FIXTURE_TITLE = 'Fixture Article About Tidal Energy';
 
+const ANALYSIS = {
+  summary: 'MOCK_SUMMARY tidal turbines generate predictable power.',
+  keyPoints: ['Tides are predictable', 'Turbines sit on the seabed'],
+  topics: ['energy', 'oceans'],
+  sentiment: 'positive',
+};
+const KNOWLEDGE = [{ topic: 'tidal energy', content: 'Tides are predictable.', confidence: 0.9 }];
+
+let server;
+let fixtureUrl;
 let browser;
-let page;
+let extensionId;
 
-// Helper to wait and retry
-const waitForSelector = async (page, selector, timeout = 5000) => {
-  try {
-    await page.waitForSelector(selector, { timeout });
-    return true;
-  } catch {
-    return false;
-  }
-};
+const FIXTURE_HTML = `<!doctype html><html><head><title>${FIXTURE_TITLE}</title>
+<meta name="description" content="A test article"></head><body><article>
+<h1>Tidal energy</h1><p>${'Tidal turbines convert the movement of tides into electricity. '.repeat(30)}</p>
+</article></body></html>`;
 
-// Get extension popup page
-const getExtensionPage = async (browser, extensionId) => {
-  const page = await browser.newPage();
-  await page.goto(`chrome-extension://${extensionId}/popup.html`, {
-    waitUntil: 'networkidle0'
+beforeAll(async () => {
+  server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(FIXTURE_HTML);
   });
-  return page;
-};
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  fixtureUrl = `http://127.0.0.1:${server.address().port}/article.html`;
+});
 
-describe('Research Assistant Extension', () => {
+afterAll(async () => {
+  await new Promise((r) => server.close(r));
+});
 
-  beforeAll(async () => {
-    // Launch browser with extension
-    browser = await puppeteer.launch({
-      headless: false, // Extensions require headed mode
-      args: [
-        `--disable-extensions-except=${EXTENSION_PATH}`,
-        `--load-extension=${EXTENSION_PATH}`,
-        '--no-sandbox',
-        '--disable-setuid-sandbox'
-      ]
-    });
-
-    // Get extension ID from service worker
-    const targets = await browser.targets();
-    const extensionTarget = targets.find(
-      target => target.type() === 'service_worker' &&
-                target.url().includes('chrome-extension://')
-    );
-
-    if (extensionTarget) {
-      const extensionUrl = extensionTarget.url();
-      const [, , extensionId] = extensionUrl.split('/');
-      global.EXTENSION_ID = extensionId;
-      console.log('Extension ID:', extensionId);
-    }
+beforeEach(async () => {
+  // Fresh browser + temporary profile per test, so storage never leaks between tests.
+  browser = await puppeteer.launch({
+    headless: !process.env.HEADFUL,
+    args: [
+      `--disable-extensions-except=${EXTENSION_PATH}`,
+      `--load-extension=${EXTENSION_PATH}`,
+      '--no-sandbox',
+    ],
   });
+  const worker = await browser.waitForTarget(
+    (t) => t.type() === 'service_worker' && t.url().startsWith('chrome-extension://'),
+    { timeout: 20000 }
+  );
+  extensionId = new URL(worker.url()).host;
+});
 
-  afterAll(async () => {
-    if (browser) {
-      await browser.close();
-    }
-  });
+afterEach(async () => {
+  if (browser) await browser.close();
+});
 
-  describe('Extension Loading', () => {
-    test('should load extension successfully', async () => {
-      expect(global.EXTENSION_ID).toBeDefined();
-      expect(global.EXTENSION_ID.length).toBeGreaterThan(0);
-    });
-
-    test('should open popup without errors', async () => {
-      const page = await getExtensionPage(browser, global.EXTENSION_ID);
-
-      // Check for React root
-      const root = await page.$('#root');
-      expect(root).not.toBeNull();
-
-      await page.close();
-    });
-  });
-
-  describe('Onboarding Flow', () => {
-    test('should show onboarding on first launch', async () => {
-      const page = await getExtensionPage(browser, global.EXTENSION_ID);
-
-      // Look for onboarding content
-      const hasOnboarding = await waitForSelector(page, 'text/Welcome to Research Assistant');
-
-      // Note: May not show if already completed
-      console.log('Onboarding visible:', hasOnboarding);
-
-      await page.close();
-    });
-  });
-
-  describe('Main UI', () => {
-    test('should display main tabs', async () => {
-      const page = await getExtensionPage(browser, global.EXTENSION_ID);
-
-      // Wait for app to load
-      await page.waitForTimeout(1000);
-
-      // Check for main navigation tabs
-      const analyzeTab = await page.$('button:has-text("Analyze")');
-      const historyTab = await page.$('button:has-text("History")');
-      const knowledgeTab = await page.$('button:has-text("Knowledge")');
-
-      // At least one tab should exist after onboarding
-      const hasUI = analyzeTab || historyTab || knowledgeTab;
-      console.log('Main UI loaded:', hasUI);
-
-      await page.close();
-    });
-
-    test('should open settings modal', async () => {
-      const page = await getExtensionPage(browser, global.EXTENSION_ID);
-
-      // Wait for app to load
-      await page.waitForTimeout(1000);
-
-      // Click settings button (gear icon)
-      const settingsBtn = await page.$('[aria-label="Settings"]');
-      if (settingsBtn) {
-        await settingsBtn.click();
-        await page.waitForTimeout(500);
-
-        // Check for settings modal
-        const settingsModal = await page.$('text/Settings');
-        expect(settingsModal).not.toBeNull();
-      }
-
-      await page.close();
-    });
-  });
-
-  describe('Settings', () => {
-    test('should have provider dropdown', async () => {
-      const page = await getExtensionPage(browser, global.EXTENSION_ID);
-
-      // Open settings
-      const settingsBtn = await page.$('[aria-label="Settings"]');
-      if (settingsBtn) {
-        await settingsBtn.click();
-        await page.waitForTimeout(500);
-
-        // Check for provider select
-        const providerSelect = await page.$('select');
-        expect(providerSelect).not.toBeNull();
-      }
-
-      await page.close();
-    });
-
-    test('should have premium tab', async () => {
-      const page = await getExtensionPage(browser, global.EXTENSION_ID);
-
-      // Open settings
-      const settingsBtn = await page.$('[aria-label="Settings"]');
-      if (settingsBtn) {
-        await settingsBtn.click();
-        await page.waitForTimeout(500);
-
-        // Check for Premium tab
-        const premiumTab = await page.$('button:has-text("Premium")');
-        expect(premiumTab).not.toBeNull();
-      }
-
-      await page.close();
-    });
-  });
-
-  describe('Export Functionality', () => {
-    test('should have export format options', async () => {
-      // This would require analyzing a page first
-      // Skipping for now as it requires API key
-      console.log('Export test skipped - requires API key');
-      expect(true).toBe(true);
-    });
-  });
-
-  describe('Performance', () => {
-    test('popup should load within 3 seconds', async () => {
-      const startTime = Date.now();
-      const page = await getExtensionPage(browser, global.EXTENSION_ID);
-
-      // Wait for React to render
-      await page.waitForSelector('#root');
-
-      const loadTime = Date.now() - startTime;
-      console.log('Popup load time:', loadTime, 'ms');
-
-      expect(loadTime).toBeLessThan(3000);
-
-      await page.close();
-    });
-
-    test('should not have console errors', async () => {
-      const page = await getExtensionPage(browser, global.EXTENSION_ID);
-
-      const errors = [];
-      page.on('console', msg => {
-        if (msg.type() === 'error') {
-          errors.push(msg.text());
-        }
+/** Mock every provider endpoint. Returns the list of intercepted provider requests. */
+async function installProviderMocks(page) {
+  const calls = [];
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    const url = req.url();
+    const json = (body) =>
+      req.respond({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify(body),
       });
+    const isKnowledge = (req.postData() || '').includes('key knowledge points');
+    const record = (provider) => calls.push({ provider, url, headers: req.headers(), body: req.postData() });
 
-      await page.waitForTimeout(2000);
+    if (url.startsWith('https://api.openai.com/v1/models')) {
+      record('openai');
+      return json({ data: [{ id: 'gpt-4o', created: 2 }, { id: 'text-embedding-3-small', created: 1 }] });
+    }
+    if (url.startsWith('https://api.openai.com/v1/chat/completions')) {
+      record('openai');
+      const content = JSON.stringify(isKnowledge ? KNOWLEDGE : ANALYSIS);
+      return json({ choices: [{ message: { content } }] });
+    }
+    if (url.startsWith('https://api.anthropic.com/v1/models')) {
+      record('anthropic');
+      return json({ data: [{ id: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5', created_at: '2026-01-01T00:00:00Z' }] });
+    }
+    if (url.startsWith('https://api.anthropic.com/v1/messages')) {
+      record('anthropic');
+      // Claude often fences JSON. The analyzer must cope with that.
+      const text = '```json\n' + JSON.stringify(isKnowledge ? KNOWLEDGE : ANALYSIS, null, 2) + '\n```';
+      return json({ content: [{ type: 'text', text }] });
+    }
+    if (url.startsWith('https://generativelanguage.googleapis.com/') && url.includes('/models?')) {
+      record('gemini');
+      return json({ models: [{ name: 'models/gemini-test-flash', displayName: 'Gemini Test Flash', supportedGenerationMethods: ['generateContent'] }] });
+    }
+    if (url.startsWith('https://generativelanguage.googleapis.com/') && url.includes(':generateContent')) {
+      record('gemini');
+      // Prose around the JSON, as Gemini sometimes does.
+      const text = 'Here is the analysis:\n' + JSON.stringify(isKnowledge ? KNOWLEDGE : ANALYSIS);
+      return json({ candidates: [{ content: { parts: [{ text }] } }] });
+    }
+    return req.continue();
+  });
+  return calls;
+}
 
-      // Filter out expected errors (like missing API key warnings)
-      const criticalErrors = errors.filter(e =>
-        !e.includes('API key') &&
-        !e.includes('net::ERR')
-      );
+/** Open the popup as a tab, tracking dialogs and uncaught errors. */
+async function openPopup({ mocks = true } = {}) {
+  const page = await browser.newPage();
+  const problems = { dialogs: [], pageErrors: [] };
+  page.on('dialog', async (d) => {
+    problems.dialogs.push(d.message());
+    await d.dismiss();
+  });
+  page.on('pageerror', (e) => problems.pageErrors.push(e.message));
+  if (process.env.E2E_DEBUG) {
+    page.on('console', (m) => console.log(`[popup ${m.type()}]`, m.text()));
+    page.on('requestfailed', (r) => console.log('[popup requestfailed]', r.url(), r.failure()?.errorText));
+  }
+  const calls = mocks ? await installProviderMocks(page) : [];
+  await page.goto(`chrome-extension://${extensionId}/popup.html`, { waitUntil: 'networkidle0' });
+  return { page, problems, calls };
+}
 
-      console.log('Console errors:', criticalErrors.length);
-      expect(criticalErrors.length).toBe(0);
+async function bodyText(page) {
+  return page.evaluate(() => document.body.innerText);
+}
 
-      await page.close();
+async function clickButtonWithText(page, text) {
+  await page.waitForFunction(
+    (t) => [...document.querySelectorAll('button')].some((b) => b.innerText.includes(t)),
+    { timeout: 10000 },
+    text
+  );
+  await page.evaluate((t) => {
+    const btn = [...document.querySelectorAll('button')].find((b) => b.innerText.includes(t));
+    btn.click();
+  }, text);
+}
+
+async function skipOnboarding(page) {
+  await clickButtonWithText(page, 'Skip');
+  await page.waitForSelector('[aria-label="Settings"]', { timeout: 10000 });
+}
+
+async function configureProvider(page, provider, expectedModelId) {
+  await page.click('[aria-label="Settings"]');
+  const providerSelect = 'select:has(option[value="anthropic"])';
+  await page.waitForSelector(providerSelect);
+  await page.select(providerSelect, provider);
+  await page.type('input[type="password"]', `test-key-${provider}`);
+  // Model list is fetched from the (mocked) provider API.
+  await page.waitForSelector(`option[value="${expectedModelId}"]`, { timeout: 10000 });
+  await clickButtonWithText(page, 'Save Settings');
+}
+
+/**
+ * Make the fixture page the active tab in the popup's window, then reload the
+ * popup so it reads that tab, the same way it does when opened from the toolbar.
+ */
+async function pointPopupAtFixture(page) {
+  await page.evaluate(async (url) => {
+    const win = await chrome.windows.getCurrent();
+    const tab = await chrome.tabs.create({ url, active: true, windowId: win.id });
+    await new Promise((resolve) => {
+      const listener = (id, info) => {
+        if (id === tab.id && info.status === 'complete') {
+          chrome.tabs.onUpdated.removeListener(listener);
+          resolve();
+        }
+      };
+      chrome.tabs.onUpdated.addListener(listener);
     });
+  }, fixtureUrl);
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.waitForFunction((t) => document.body.innerText.includes(t), { timeout: 10000 }, FIXTURE_TITLE);
+  // The popup has captured the fixture tab's content; put it back in the foreground,
+  // as a real popup would be, so rendering isn't throttled as a background tab.
+  await page.bringToFront();
+}
+
+describe('Loading', () => {
+  test('popup opens without uncaught errors', async () => {
+    const { page, problems } = await openPopup();
+    expect(await page.title()).toBeDefined();
+    expect(problems.pageErrors).toEqual([]);
+  });
+
+  test('onboarding shows on first launch and stays dismissed', async () => {
+    const { page } = await openPopup();
+    expect(await bodyText(page)).toMatch(/Skip/);
+    await skipOnboarding(page);
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.waitForSelector('[aria-label="Settings"]');
+    expect(await bodyText(page)).not.toMatch(/Skip tour/);
   });
 });
 
-// Run tests if called directly
-if (require.main === module) {
-  console.log('Run tests with: npm test');
-}
+describe('Free tier (paid tier disabled)', () => {
+  test('no upgrade, Pro, or Premium prompts anywhere', async () => {
+    const { page } = await openPopup();
+    await skipOnboarding(page);
+    const main = await bodyText(page);
+    await page.click('[aria-label="Settings"]');
+    const settings = await bodyText(page);
+    await clickButtonWithText(page, 'Integrations');
+    const integrations = await bodyText(page);
+    for (const text of [main, settings, integrations]) {
+      expect(text).not.toMatch(/Upgrade|Premium|\bPRO\b/);
+    }
+  });
+
+  test('Notion connect form is available without a paywall', async () => {
+    const { page } = await openPopup();
+    await skipOnboarding(page);
+    await page.click('[aria-label="Settings"]');
+    await clickButtonWithText(page, 'Integrations');
+    expect(await bodyText(page)).toMatch(/Notion/);
+    expect(await bodyText(page)).not.toMatch(/Upgrade to Premium/);
+  });
+});
+
+describe('Anthropic requests', () => {
+  test('model list and messages include the browser-access header', async () => {
+    const { page, calls, problems } = await openPopup();
+    await skipOnboarding(page);
+    await configureProvider(page, 'anthropic', 'claude-sonnet-5-5');
+    await pointPopupAtFixture(page);
+    await clickButtonWithText(page, 'ANALYZE PAGE');
+    await page.waitForFunction(() => document.body.innerText.includes('MOCK_SUMMARY'), { timeout: 15000 });
+
+    const anthropic = calls.filter((c) => c.provider === 'anthropic');
+    expect(anthropic.some((c) => c.url.includes('/v1/models'))).toBe(true);
+    expect(anthropic.some((c) => c.url.includes('/v1/messages'))).toBe(true);
+    for (const c of anthropic) {
+      expect(c.headers['anthropic-dangerous-direct-browser-access']).toBe('true');
+    }
+    expect(problems.dialogs).toEqual([]);
+  });
+});
+
+describe.each([
+  ['openai', 'gpt-4o', 'plain JSON'],
+  ['anthropic', 'claude-sonnet-5-5', 'JSON in ```json fences'],
+  ['gemini', 'gemini-test-flash', 'JSON after prose'],
+])('Analyze flow with %s', (provider, modelId, format) => {
+  test(`summarizes the page and saves it (${format})`, async () => {
+    const { page, calls, problems } = await openPopup();
+    await skipOnboarding(page);
+    await configureProvider(page, provider, modelId);
+    await pointPopupAtFixture(page);
+    await clickButtonWithText(page, 'ANALYZE PAGE');
+
+    await page.waitForFunction(() => document.body.innerText.includes('MOCK_SUMMARY'), { timeout: 15000 });
+    expect(await bodyText(page)).not.toContain('Error analyzing content');
+    await clickButtonWithText(page, 'Key Points');
+    await page.waitForFunction(() => document.body.innerText.includes('Tides are predictable'), { timeout: 5000 });
+    expect(problems.dialogs).toEqual([]);
+
+    // The request used the model picked from the fetched list and contained the page text.
+    const analyzeCall = calls.find(
+      (c) => c.provider === provider && c.body && c.body.includes('Analyze the following web content')
+    );
+    expect(analyzeCall).toBeDefined();
+    expect(analyzeCall.body + analyzeCall.url).toContain(modelId);
+    expect(analyzeCall.body).toContain('Tidal turbines convert');
+
+    // The page was saved to IndexedDB.
+    const saved = await page.evaluate(
+      () =>
+        new Promise((resolve, reject) => {
+          const open = indexedDB.open('ResearchDB');
+          open.onerror = () => reject(open.error);
+          open.onsuccess = () => {
+            const req = open.result.transaction('pages').objectStore('pages').getAll();
+            req.onsuccess = () => resolve(req.result.map((p) => p.title));
+            req.onerror = () => reject(req.error);
+          };
+        })
+    );
+    expect(saved).toContain(FIXTURE_TITLE);
+  });
+});
