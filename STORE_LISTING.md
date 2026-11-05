@@ -5,7 +5,7 @@
 
 ## Short Description (132 characters max)
 ```
-AI-powered research tool. Analyze any webpage, extract key insights, and build your personal knowledge base. Works with GPT, Claude & Gemini.
+Summarize any webpage with AI, save insights to a searchable knowledge base, export to Notion or Obsidian. GPT, Claude, Gemini.
 ```
 
 ## Detailed Description
@@ -31,17 +31,16 @@ Transform how you consume online content. Research Assistant uses AI to instantl
 • AI-powered answers from your collected insights
 • Organize with customizable workspaces
 
-📤 Flexible Export Options
-• Markdown export (free)
-• JSON & HTML export (Pro)
-• Obsidian integration with frontmatter & wikilinks (Pro)
-• Notion database export (Pro)
+📤 Export Anywhere (all free)
+• Markdown, JSON & HTML export
+• Obsidian integration with YAML frontmatter & wikilinks
+• Notion database export
 
 🔒 Privacy-First Design
 • Your API key stays on your device
 • No tracking, no analytics, no data collection
 • All data stored locally in your browser
-• Direct API calls to OpenAI/Anthropic - we never see your data
+• Direct API calls to OpenAI, Anthropic or Google Gemini. We never see your data
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -49,7 +48,7 @@ Transform how you consume online content. Research Assistant uses AI to instantl
 
 1. Install the extension
 2. Click the Research Assistant icon
-3. Add your OpenAI or Anthropic API key in Settings
+3. Add your OpenAI, Anthropic or Gemini API key in Settings
 4. Navigate to any webpage and click "Analyze Page"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -66,20 +65,8 @@ Transform how you consume online content. Research Assistant uses AI to instantl
 
 🔑 REQUIREMENTS
 
-• An API key from OpenAI or Anthropic (bring your own key)
+• An API key from OpenAI, Anthropic or Google Gemini (bring your own key)
 • Chrome browser (Manifest V3 compatible)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-⭐ PRO FEATURES
-
-Upgrade to Pro to unlock:
-• Export to JSON & HTML formats
-• Obsidian integration with YAML frontmatter
-• Notion database integration
-• PDF analysis (coming soon)
-• Citation generator (coming soon)
-• Priority support
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -93,6 +80,7 @@ Having issues? We're here to help!
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Research Assistant respects your privacy. We don't collect any personal data, and your API keys never leave your device. Read our full privacy policy for details.
+
 
 Made with ❤️ for researchers everywhere.
 ```
@@ -109,6 +97,9 @@ Made with ❤️ for researchers everywhere.
 - summary
 - GPT
 - Claude
+- Gemini
+- summarize webpage
+- article summarizer
 - knowledge base
 - page analyzer
 - productivity
@@ -130,7 +121,7 @@ Show the Knowledge tab with the Q&A interface and knowledge items.
 Show the export dropdown with different format options (Markdown, JSON, Obsidian, Notion).
 
 ### Screenshot 4: Settings
-Show the settings modal with API configuration and premium features.
+Show the settings modal with API provider and model selection.
 
 ### Screenshot 5: Workspaces
 Show the workspace manager with multiple workspaces organized by project.
@@ -157,23 +148,21 @@ Build your personal knowledge base
 ## Version 2.0 Changelog
 
 ```
-Version 2.0 - Premium Features Update
+Version 2.0
 
-NEW FEATURES:
-• Premium subscription with Pro features
-• Obsidian integration - export with frontmatter and wikilinks
-• Notion integration - export directly to your databases
+NEW
+• Google Gemini support, plus updated model lists for all providers
+• Obsidian export with frontmatter and wikilinks
+• Notion export straight to your databases
 • JSON and HTML export formats
-• License key activation system
+• Onboarding walkthrough for new users
 
-IMPROVEMENTS:
-• Redesigned settings with tabbed interface
-• Export format selector in analysis results
-• Better error handling and user feedback
-• Performance optimizations
+FIXES
+• Claude (Anthropic) requests no longer blocked by the browser
 
-COMING SOON:
-• PDF analysis
-• Citation generator
-• Highlight-to-analyze
+IMPROVEMENTS
+• Tabbed settings
+• Export format picker in analysis results
+• Better error messages
+• Faster load times
 ```

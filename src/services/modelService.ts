@@ -97,18 +97,32 @@ export class ModelService {
   }
 
   private async getAnthropicModels(): Promise<Model[]> {
-    // Anthropic doesn't have a public models list API
-    // Return curated list of currently available models
-    // These are fetched from Anthropic's documentation
-    return [
-      { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4' },
-      { id: 'claude-3-7-sonnet-20250219', name: 'Claude 3.7 Sonnet' },
-      { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet v2' },
-      { id: 'claude-3-5-sonnet-20240620', name: 'Claude 3.5 Sonnet' },
-      { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku' },
-      { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
-      { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
-    ];
+    // Live list from Anthropic's Models API, so retired models never appear.
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/models?limit=100', {
+        headers: {
+          'x-api-key': this.settings.apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Anthropic API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const models = (data.data || []).map((model: any) => ({
+        id: model.id,
+        name: model.display_name || model.id,
+        created: model.created_at ? Date.parse(model.created_at) : undefined
+      }));
+
+      return models.length > 0 ? models : this.getFallbackModels();
+    } catch (error) {
+      console.error('Error fetching Anthropic models:', error);
+      return this.getFallbackModels();
+    }
   }
 
   private async getGeminiModels(): Promise<Model[]> {
@@ -173,11 +187,9 @@ export class ModelService {
         ];
       case 'anthropic':
         return [
-          { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4' },
-          { id: 'claude-3-7-sonnet-20250219', name: 'Claude 3.7 Sonnet' },
-          { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet v2' },
-          { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku' },
-          { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
+          { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
+          { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' },
+          { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
         ];
       case 'gemini':
         return [

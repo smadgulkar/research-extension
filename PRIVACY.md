@@ -1,6 +1,6 @@
 # Privacy Policy for Research Assistant
 
-**Last Updated:** January 2025
+**Last Updated:** November 2026
 
 ## Overview
 
@@ -11,12 +11,12 @@ Research Assistant is a browser extension that helps you analyze web content usi
 ### What We Collect
 
 **Locally Stored Data (on your device only):**
-- Your API keys for OpenAI or Anthropic (encrypted in browser storage)
+- Your API keys for OpenAI, Anthropic, or Google Gemini (stored unencrypted in your browser's local extension storage)
 - Analyzed page content and summaries
 - Your personal knowledge base entries
 - Workspace configurations
 - Extension settings and preferences
-- Premium license keys (if applicable)
+- Your Notion integration token, if you connect Notion
 
 ### What We Do NOT Collect
 
@@ -24,19 +24,20 @@ Research Assistant is a browser extension that helps you analyze web content usi
 - We do NOT track your browsing history
 - We do NOT send any data to our servers
 - We do NOT use analytics or tracking services
-- We do NOT share any data with third parties
+- We do NOT share any data with third parties, other than sending content to the services you choose (your AI provider, and Notion if you connect it)
 - We do NOT store your data in the cloud
 
 ## Data Transmission
 
 ### API Calls
-When you analyze a page, the content is sent directly to your chosen AI provider (OpenAI or Anthropic) using YOUR API key. We act only as a facilitator—the data flows directly from your browser to the AI provider.
+When you analyze a page, the content is sent directly to your chosen AI provider (OpenAI, Anthropic, or Google Gemini) using YOUR API key. We act only as a facilitator—the data flows directly from your browser to the AI provider.
 
 - **OpenAI:** Subject to [OpenAI's Privacy Policy](https://openai.com/privacy)
 - **Anthropic:** Subject to [Anthropic's Privacy Policy](https://www.anthropic.com/privacy)
+- **Google Gemini:** Subject to [Google's Privacy Policy](https://policies.google.com/privacy)
 
-### Notion Integration (Premium)
-If you connect to Notion, data is sent directly to Notion's API using your personal integration token. We do not have access to your Notion account.
+### Notion Integration (optional)
+If you connect to Notion, the extension asks for permission to access api.notion.com, and data is sent directly to Notion's API using your personal integration token. We do not have access to your Notion account.
 
 ### No Intermediary Servers
 Research Assistant does not operate any backend servers. All extension functionality runs locally in your browser.
@@ -49,12 +50,12 @@ All data is stored locally using:
 
 Your data never leaves your device unless you explicitly:
 1. Make an API call to analyze content
-2. Export to Notion (Premium feature)
+2. Export to Notion
 3. Share via the Web Share API
 
 ## Data Security
 
-- API keys are stored in browser local storage
+- API keys are stored unencrypted in your browser's local extension storage. Anyone with access to your browser profile could read them, so use keys with spending limits
 - All API communications use HTTPS encryption
 - No data is transmitted to any servers we control
 
@@ -87,7 +88,7 @@ For privacy-related questions or concerns, please open an issue on our GitHub re
 | Personal info | No | No | No |
 | Browsing history | No | No | No |
 | Page content (for analysis) | Yes* | Locally | With AI provider* |
-| API keys | Yes | Locally | No |
+| API keys | Yes | Locally (unencrypted) | Only with the matching provider |
 | Usage analytics | No | No | No |
 
 *Only when you click "Analyze Page"

@@ -2,11 +2,14 @@
   "manifest_version": 3,
   "name": "Research Assistant",
   "version": "2.0.0",
-  "description": "AI-powered research tool. Analyze any webpage, extract key insights, and build your personal knowledge base.",
+  "description": "Summarize any webpage with AI, save insights to a searchable knowledge base, export to Notion or Obsidian. GPT, Claude, Gemini.",
   "permissions": [
     "activeTab",
     "scripting",
     "storage"
+  ],
+  "optional_host_permissions": [
+    "https://api.notion.com/*"
   ],
   "icons": {
     "48": "icon48.png",

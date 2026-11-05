@@ -20,7 +20,7 @@ import FeedbackButton from '../components/FeedbackButton';
 import PremiumSettings from './components/PremiumSettings';
 import NotionSettings from './components/NotionSettings';
 import Onboarding from './components/Onboarding';
-import { premiumService } from '../services/premiumService';
+import { premiumService, PAID_TIER_ENABLED } from '../services/premiumService';
 
 const ONBOARDING_KEY = 'research_assistant_onboarding_complete';
 
@@ -659,6 +659,7 @@ const App: React.FC = () => {
                   <Key size={16} />
                   API Settings
                 </button>
+                {PAID_TIER_ENABLED && (
                 <button
                   onClick={() => setSettingsTab('premium')}
                   className={`flex-1 py-3 px-4 text-sm font-medium flex items-center justify-center gap-2 ${
@@ -675,6 +676,7 @@ const App: React.FC = () => {
                     </span>
                   )}
                 </button>
+                )}
                 <button
                   onClick={() => setSettingsTab('integrations')}
                   className={`flex-1 py-3 px-4 text-sm font-medium flex items-center justify-center gap-2 ${
@@ -752,7 +754,7 @@ const App: React.FC = () => {
                     Save Settings
                   </button>
                 </div>
-              ) : settingsTab === 'premium' ? (
+              ) : PAID_TIER_ENABLED && settingsTab === 'premium' ? (
                 <PremiumSettings onClose={() => {
                   premiumService.isPremium().then(setIsPremium);
                 }} />

@@ -86,10 +86,12 @@ export class LLMService {
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': this.settings.apiKey,
-          'anthropic-version': '2023-06-01'
+          'anthropic-version': '2023-06-01',
+          // Required by Anthropic for requests made from a browser/extension context (CORS)
+          'anthropic-dangerous-direct-browser-access': 'true'
         },
         body: JSON.stringify({
-          model: this.settings.model || 'claude-sonnet-4-20250514',
+          model: this.settings.model || 'claude-sonnet-5-5',
           messages: [
             {
               role: 'user',

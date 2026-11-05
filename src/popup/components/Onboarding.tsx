@@ -32,7 +32,7 @@ const STEPS = [
     id: 'export',
     icon: BookOpen,
     title: 'Export Anywhere',
-    description: 'Export your research as Markdown, or upgrade to Pro for JSON, HTML, Obsidian, and Notion integrations.',
+    description: 'Export your research as Markdown, JSON, or HTML, or send it straight to Obsidian and Notion.',
     color: 'green',
   },
   {

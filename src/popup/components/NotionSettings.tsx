@@ -3,6 +3,8 @@ import { Check, AlertCircle, ExternalLink, Database, Unlink, RefreshCw } from 'l
 import { notionService } from '../../services/notionService';
 import { premiumService } from '../../services/premiumService';
 
+const NOTION_ORIGIN = 'https://api.notion.com/*';
+
 interface NotionDatabase {
   id: string;
   title: string;
@@ -53,6 +55,14 @@ const NotionSettings: React.FC<NotionSettingsProps> = ({ onClose }) => {
   const handleConnect = async () => {
     if (!token.trim()) {
       setError('Please enter your Notion integration token');
+      return;
+    }
+
+    // Notion's API does not allow browser CORS requests, so the extension needs
+    // host access to api.notion.com. Request it here, inside the click gesture.
+    const granted = await chrome.permissions.request({ origins: [NOTION_ORIGIN] });
+    if (!granted) {
+      setError('Permission to access api.notion.com is required to connect Notion');
       return;
     }
 

@@ -1,6 +1,10 @@
 // Premium subscription management service
 import type { PremiumStatus, ExportFormat } from '../types/models';
 
+// Paid tier is OFF until there is a real checkout + server-side license verification.
+// While false, every feature is unlocked and no upgrade/checkout UI is shown.
+export const PAID_TIER_ENABLED = false;
+
 const PREMIUM_STORAGE_KEY = 'research_assistant_premium';
 const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/YOUR_PAYMENT_LINK'; // Replace with actual link
 const STRIPE_CUSTOMER_PORTAL = 'https://billing.stripe.com/p/login/YOUR_PORTAL'; // Replace with actual portal
@@ -63,29 +67,17 @@ class PremiumService {
   }
 
   async isPremium(): Promise<boolean> {
+    if (!PAID_TIER_ENABLED) return true;
     const status = await this.getStatus();
     return status.isPremium;
   }
 
   // Activate premium with a license key
-  async activateLicense(licenseKey: string, email?: string): Promise<boolean> {
-    // Basic license key validation (format: XXXX-XXXX-XXXX-XXXX)
-    const keyPattern = /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
-    if (!keyPattern.test(licenseKey.toUpperCase())) {
-      throw new Error('Invalid license key format');
-    }
-
-    // In a real implementation, you would validate with a backend
-    // For now, we'll accept valid-format keys
-    this.status = {
-      isPremium: true,
-      licenseKey: licenseKey.toUpperCase(),
-      email,
-      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
-    };
-
-    await this.saveStatus();
-    return true;
+  // Activate premium with a license key.
+  // There is no verification backend yet, so activation always fails rather than
+  // granting premium to any string that merely looks like a key.
+  async activateLicense(_licenseKey: string, _email?: string): Promise<boolean> {
+    throw new Error('License activation is not available yet');
   }
 
   // Deactivate premium
@@ -136,11 +128,13 @@ class PremiumService {
 
   // Open checkout in new tab
   openCheckout(): void {
+    if (!PAID_TIER_ENABLED) return;
     chrome.tabs.create({ url: STRIPE_PAYMENT_LINK });
   }
 
   // Open customer portal in new tab
   openCustomerPortal(): void {
+    if (!PAID_TIER_ENABLED) return;
     chrome.tabs.create({ url: STRIPE_CUSTOMER_PORTAL });
   }
 }
