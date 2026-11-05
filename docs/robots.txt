@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://smadgulkar.github.io/research-extension/sitemap.xml

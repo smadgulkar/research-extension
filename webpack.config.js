@@ -39,6 +39,7 @@ function transformManifest(manifest) {
   if (isE2E) {
     manifest.host_permissions = [
       'http://127.0.0.1/*',
+      'http://blog.example.com/*', // screenshots only (scripts/screenshots.js)
       'https://api.openai.com/*',
       'https://api.anthropic.com/*',
       'https://generativelanguage.googleapis.com/*',

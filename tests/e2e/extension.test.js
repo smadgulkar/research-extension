@@ -298,3 +298,58 @@ describe.each([
     expect(saved).toContain(FIXTURE_TITLE);
   });
 });
+
+describe('Rating prompt', () => {
+  async function analyzeOnce(page) {
+    await pointPopupAtFixture(page);
+    await clickButtonWithText(page, 'ANALYZE PAGE');
+    await page.waitForFunction(() => document.body.innerText.includes('MOCK_SUMMARY'), { timeout: 15000 });
+  }
+
+  const promptVisible = (page) => page.$('[data-testid="rating-prompt"]').then(Boolean);
+
+  test('does not appear before the 5th successful analysis', async () => {
+    const { page } = await openPopup();
+    await skipOnboarding(page);
+    await configureProvider(page, 'openai', 'gpt-4o');
+    await analyzeOnce(page);
+    expect(await promptVisible(page)).toBe(false);
+    expect(await page.evaluate(() => chrome.storage.local.get('successful_analysis_count'))).toEqual({
+      successful_analysis_count: 1,
+    });
+  });
+
+  test('appears on the 5th analysis; "Rate it" opens this extension\'s review page and never shows again', async () => {
+    const { page } = await openPopup();
+    await skipOnboarding(page);
+    await configureProvider(page, 'openai', 'gpt-4o');
+    await page.evaluate(() => chrome.storage.local.set({ successful_analysis_count: 4 }));
+    await analyzeOnce(page);
+    await page.waitForSelector('[data-testid="rating-prompt"]', { timeout: 5000 });
+
+    const reviewTab = browser.waitForTarget(
+      (t) => t.url().startsWith(`https://chromewebstore.google.com/detail/${extensionId}/reviews`),
+      { timeout: 10000 }
+    );
+    await clickButtonWithText(page, 'Rate it');
+    await reviewTab;
+
+    expect(await promptVisible(page)).toBe(false);
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.waitForSelector('[aria-label="Settings"]');
+    expect(await promptVisible(page)).toBe(false);
+  });
+
+  test('"No thanks" hides it for good', async () => {
+    const { page } = await openPopup();
+    await skipOnboarding(page);
+    await page.evaluate(() => chrome.storage.local.set({ successful_analysis_count: 7 }));
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.waitForSelector('[data-testid="rating-prompt"]', { timeout: 5000 });
+    await clickButtonWithText(page, 'No thanks');
+    expect(await promptVisible(page)).toBe(false);
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.waitForSelector('[aria-label="Settings"]');
+    expect(await promptVisible(page)).toBe(false);
+  });
+});

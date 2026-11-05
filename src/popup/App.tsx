@@ -18,6 +18,7 @@ import WorkspaceManager from './components/WorkspaceManager';
 import { KnowledgeExplorerRef } from './components/KnowledgeExplorer';
 import FeedbackButton from '../components/FeedbackButton';
 import PremiumSettings from './components/PremiumSettings';
+import RatingPrompt, { recordSuccessfulAnalysis, shouldShowRatingPrompt } from './components/RatingPrompt';
 import NotionSettings from './components/NotionSettings';
 import Onboarding from './components/Onboarding';
 import { premiumService, PAID_TIER_ENABLED } from '../services/premiumService';
@@ -95,6 +96,7 @@ const App: React.FC = () => {
   const knowledgeExplorerRef = useRef<KnowledgeExplorerRef>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number | null>(null);
   const [isPremium, setIsPremium] = useState(false);
+  const [showRatingPrompt, setShowRatingPrompt] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'api' | 'premium' | 'integrations'>('api');
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -114,6 +116,8 @@ const App: React.FC = () => {
         // Load premium status
         const premiumStatus = await premiumService.isPremium();
         setIsPremium(premiumStatus);
+
+        setShowRatingPrompt(await shouldShowRatingPrompt());
 
         await Promise.all([
           loadCurrentPage(),
@@ -292,6 +296,7 @@ const App: React.FC = () => {
       
       await loadSavedPages();
       handleAnalysisComplete(page);
+      if (await recordSuccessfulAnalysis()) setShowRatingPrompt(true);
       
       console.log('Analysis completed successfully');
     } catch (error) {
@@ -602,6 +607,8 @@ const App: React.FC = () => {
             )}
           </div>
           
+          {showRatingPrompt && <RatingPrompt onDone={() => setShowRatingPrompt(false)} />}
+
           {/* Move the analyze button to the bottom */}
           {activeTab === 'analyze' && (
             <button 

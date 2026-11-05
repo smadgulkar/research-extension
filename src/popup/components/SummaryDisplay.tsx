@@ -214,9 +214,9 @@ const SummaryDisplay: React.FC<SummaryDisplayProps> = ({
           )}
         </div>
         
-        <div className="px-4 py-3 border-t flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500">Export as:</span>
+        <div className="px-4 py-3 border-t flex flex-wrap gap-2 justify-between items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 whitespace-nowrap">Export as:</span>
             <div className="relative">
               <button
                 onClick={() => setShowFormatDropdown(!showFormatDropdown)}
@@ -245,7 +245,7 @@ const SummaryDisplay: React.FC<SummaryDisplayProps> = ({
               )}
             </div>
           </div>
-          <div className="flex space-x-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={handleCopy}
               className="flex items-center px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
