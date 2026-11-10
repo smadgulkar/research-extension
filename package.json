@@ -15,7 +15,8 @@
     "verify": "npm run typecheck && npm run build:all && npm run lint:firefox && npm run test:e2e",
     "analyze": "cross-env NODE_ENV=production ANALYZE=true webpack --mode production",
     "release": "node scripts/release.mjs",
-    "screenshots": "npm run build:e2e && node scripts/screenshots.js"
+    "screenshots": "npm run build:e2e && node scripts/screenshots.js",
+    "dashboard": "node dashboard/collect.mjs"
   },
   "keywords": [],
   "author": "",
