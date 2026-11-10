@@ -51,7 +51,7 @@ gh secret set NAME --repo smadgulkar/research-extension   # paste the value when
 ### Microsoft Edge Add-ons (about 30 minutes plus first review)
 
 1. Register at Partner Center (free): https://partner.microsoft.com/dashboard/microsoftedge
-2. **First submission is manual.** Upload `research-assistant-chrome-X.Y.Z.zip` from the latest GitHub Release, and reuse the text in `STORE_LISTING.md` and the privacy policy in `PRIVACY.md`.
+2. **First submission is manual.** Upload `mindstack-chrome-X.Y.Z.zip` from the latest GitHub Release, and reuse the text in `STORE_LISTING.md` and the privacy policy in `PRIVACY.md`.
 3. Go to Microsoft Edge → **Publish API** → enable → **Create API credentials**.
 4. Set these secrets:
    - `EDGE_CLIENT_ID`

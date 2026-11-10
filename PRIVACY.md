@@ -1,10 +1,10 @@
-# Privacy Policy for Research Assistant
+# Privacy Policy for Mindstack (formerly Research Assistant)
 
 **Last Updated:** November 2026
 
 ## Overview
 
-Research Assistant is a browser extension that helps you analyze web content using AI. We are committed to protecting your privacy and being transparent about our data practices.
+Mindstack is a browser extension that helps you analyze web content using AI. We are committed to protecting your privacy and being transparent about our data practices.
 
 ## Data Collection
 
@@ -40,7 +40,7 @@ When you analyze a page, the content is sent directly to your chosen AI provider
 If you connect to Notion, the extension asks for permission to access api.notion.com, and data is sent directly to Notion's API using your personal integration token. We do not have access to your Notion account.
 
 ### No Intermediary Servers
-Research Assistant does not operate any backend servers. All extension functionality runs locally in your browser.
+Mindstack does not operate any backend servers. All extension functionality runs locally in your browser.
 
 ## Data Storage
 
@@ -69,7 +69,7 @@ You have full control over your data:
 
 ## Children's Privacy
 
-Research Assistant is not intended for use by children under 13. We do not knowingly collect data from children.
+Mindstack is not intended for use by children under 13. We do not knowingly collect data from children.
 
 ## Changes to This Policy
 

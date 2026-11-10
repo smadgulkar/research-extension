@@ -61,10 +61,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp release/chrome.zip "research-assistant-chrome-$VERSION.zip"
-          cp release/firefox.zip "research-assistant-firefox-$VERSION.zip"
+          cp release/chrome.zip "mindstack-chrome-$VERSION.zip"
+          cp release/firefox.zip "mindstack-firefox-$VERSION.zip"
           gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file release/NOTES.md \
-            "research-assistant-chrome-$VERSION.zip" "research-assistant-firefox-$VERSION.zip"
+            "mindstack-chrome-$VERSION.zip" "mindstack-firefox-$VERSION.zip"
 
   chrome:
     needs: package

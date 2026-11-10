@@ -425,7 +425,7 @@ const App: React.FC = () => {
           <header className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
             <div className="flex items-center">
               <BookOpen className="text-blue-600 mr-2" size={20} />
-              <h1 className="text-lg font-medium text-gray-800">Research Assistant</h1>
+              <h1 className="text-lg font-medium text-gray-800">Mindstack</h1>
             </div>
             <button 
               onClick={() => setShowSettings(true)}

@@ -1,18 +1,21 @@
-# Research Assistant
+# Mindstack
 
-**Free AI webpage summarizer for Chrome and Firefox. Bring your own key, no account, exports to Obsidian and Notion.**
+**Turn everything you read into an AI knowledge base you can ask. Free for Chrome and Firefox. Bring your own key, no account, exports to Obsidian and Notion.**
 
-Summarize any article, doc or paper with OpenAI GPT, Anthropic Claude or Google Gemini, using your own API key. Every analysis is saved to a searchable library in your browser and can be sent to Obsidian, Notion, Markdown, JSON or HTML. There are no servers, no accounts and no tracking.
+*Formerly Research Assistant.*
+
+Mindstack captures the articles, docs and papers you read, distills each one into a summary and key points with OpenAI GPT, Anthropic Claude or Google Gemini (your own API key), and builds a personal knowledge base you can search and ask questions across. Everything stays in your browser and can be exported to Obsidian, Notion, Markdown, JSON or HTML. No servers, no accounts, no tracking.
 
 [Add to Chrome](https://chromewebstore.google.com/detail/research-assistant/idkghcjlmgaiodkjgfcfijjkdcoakanl) · [Add to Firefox](https://addons.mozilla.org/firefox/addon/research-assistant/) · [Website](https://smadgulkar.github.io/research-extension/)
 
-![Research Assistant summarizing an article](docs/screenshots/1-summary.png)
+![Mindstack answering a question from saved reading](docs/screenshots/1-ask.png)
 
 ## Features
 
-- **One-click summaries:** summary, key points, topics and sentiment for the page you're reading
+- **A knowledge base that builds itself:** every page you analyze becomes searchable knowledge, organized into workspaces
+- **Ask what you've read:** Q&A across everything you've saved, not the open web
+- **One-click distillation:** summary, key points, topics and sentiment for the page you're reading
 - **Your choice of AI:** OpenAI, Anthropic Claude or Google Gemini; the model list is fetched live from your provider
-- **Research library:** searchable history, workspaces, and Q&A across everything you've analyzed
 - **Obsidian export:** notes with YAML frontmatter, tags and wikilinks, sent straight to your vault
 - **Notion export:** each analysis saved as a page in the database you choose
 - **Markdown, JSON and HTML** copy and download
@@ -23,8 +26,8 @@ Page text goes directly from your browser to the AI provider you pick, using you
 
 | | |
 |---|---|
-| ![Key points](docs/screenshots/2-key-points.png) | ![Export formats](docs/screenshots/3-export.png) |
-| ![History](docs/screenshots/4-history.png) | ![Settings](docs/screenshots/5-settings.png) |
+| ![Summary](docs/screenshots/2-summary.png) | ![Key points](docs/screenshots/3-key-points.png) |
+| ![Knowledge base](docs/screenshots/4-history.png) | ![Export formats](docs/screenshots/5-export.png) |
 
 ## Development
 

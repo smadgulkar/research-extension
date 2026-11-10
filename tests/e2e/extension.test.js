@@ -1,5 +1,5 @@
 /**
- * E2E tests for Research Assistant.
+ * E2E tests for Mindstack (formerly Research Assistant).
  *
  * Runs the real extension in headless Chrome against a local fixture page.
  * All AI provider APIs are mocked via request interception, so no API keys

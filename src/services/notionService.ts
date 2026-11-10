@@ -285,7 +285,7 @@ class NotionService {
         rich_text: [
           {
             type: 'text',
-            text: { content: `Sentiment: ${data.sentiment} • Analyzed with Research Assistant` },
+            text: { content: `Sentiment: ${data.sentiment} • Analyzed with Mindstack` },
             annotations: { italic: true, color: 'gray' },
           },
         ],

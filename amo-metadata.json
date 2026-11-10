@@ -1,10 +1,17 @@
 {
-  "categories": { "firefox": ["search-tools"] },
+  "categories": {
+    "firefox": [
+      "search-tools"
+    ]
+  },
   "summary": {
-    "en-US": "Summarize any webpage with AI, save insights to a searchable knowledge base, export to Notion or Obsidian. GPT, Claude, Gemini."
+    "en-US": "Turn what you read into a searchable AI knowledge base. Summaries & Q&A via GPT, Claude or Gemini. Export to Obsidian & Notion."
   },
   "version": {
     "license": "all-rights-reserved",
     "approval_notes": "Source is uploaded with each version. Build: Node 22, `npm ci && npm run build:firefox`, output in dist-firefox/. popup.js is a webpack bundle of src/; the Function/innerHTML lint warnings come from lodash, the webpack runtime and react-dom, not from extension code. The extension makes network requests only to the AI provider the user configures (OpenAI, Anthropic or Google Gemini, using the user's own API key) and, optionally, to api.notion.com when the user connects Notion. No analytics, no remote code."
+  },
+  "name": {
+    "en-US": "Mindstack – AI knowledge base & summarizer"
   }
 }

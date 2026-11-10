@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Research Assistant: store dashboard</title>
+<title>Mindstack: store dashboard</title>
 <style>
   :root {
     --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
@@ -130,7 +130,7 @@ function render() {
 
   app.append($(`
     <header>
-      <div><h1>Research Assistant: store dashboard</h1>
+      <div><h1>Mindstack: store dashboard</h1>
       <div class="sub">Updated ${new Date(DATA.generatedAt).toLocaleString()} · history: ${DATA.history.length} day${DATA.history.length === 1 ? '' : 's'} · run <code>npm run dashboard</code> to refresh</div></div>
       <div class="chips">${['CWS', 'AMO', 'EDGE'].map((p) => {
         const names = { CWS:'Chrome publishing', AMO:'Firefox publishing', EDGE:'Edge publishing' };
@@ -198,7 +198,7 @@ function render() {
       </div>
       <div class="card">
         <h2>Chrome CSV import</h2>
-        <p class="sub" style="margin-top:0">For exact weekly users: Chrome dashboard → Research Assistant → <b>Analytics → Users</b> → export CSV, then save it into <code>dashboard/data/chrome-csv/</code> and re-run.</p>
+        <p class="sub" style="margin-top:0">For exact weekly users: Chrome dashboard → Mindstack → <b>Analytics → Users</b> → export CSV, then save it into <code>dashboard/data/chrome-csv/</code> and re-run.</p>
         <div class="note">${DATA.chromeCsvFiles.length ? `Loaded ${DATA.chromeCsvFiles.length} file(s), ${Object.keys(DATA.chromeCsv).length} dated points: ${DATA.chromeCsvFiles.map(esc).join(', ')}` : 'No CSV loaded yet.'}</div>
         ${DATA.chromeCsvFiles.length && !Object.keys(DATA.chromeCsv).length ? '<div class="banner" style="margin-top:10px">CSV found but no rows could be read. The column names may differ from what the parser expects.</div>' : ''}
       </div>

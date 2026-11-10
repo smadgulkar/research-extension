@@ -1,8 +1,8 @@
 // src/services/debugService.ts
 export const debugLog = (message: string, data?: any) => {
-    console.log(`[Research Assistant] ${message}`, data || '');
+    console.log(`[Mindstack] ${message}`, data || '');
   };
   
   export const debugError = (message: string, error?: any) => {
-    console.error(`[Research Assistant] ${message}`, error || '');
+    console.error(`[Mindstack] ${message}`, error || '');
   };

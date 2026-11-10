@@ -3,35 +3,38 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Research Assistant: free AI webpage summarizer for Chrome &amp; Firefox, with Obsidian and Notion export</title>
-<meta name="description" content="Free browser extension that summarizes any webpage with GPT, Claude or Gemini using your own API key. No account, no servers: saves to a local knowledge base and exports to Obsidian, Notion and Markdown.">
+<title>Mindstack: turn everything you read into an AI knowledge base (Chrome &amp; Firefox)</title>
+<meta name="description" content="Mindstack is a free browser extension that turns the articles, docs and papers you read into a searchable AI knowledge base you can ask questions. GPT, Claude or Gemini with your own key. No account, no servers. Exports to Obsidian and Notion.">
 <link rel="canonical" href="https://smadgulkar.github.io/research-extension/">
 <link rel="icon" href="icon128.png">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Research Assistant: free AI webpage summarizer, bring your own key">
-<meta property="og:description" content="Summarize any page with GPT, Claude or Gemini. No account, no servers. Export to Obsidian and Notion.">
+<meta property="og:title" content="Mindstack: everything you read, remembered and searchable">
+<meta property="og:description" content="Turn what you read into an AI knowledge base you can ask. Bring your own GPT, Claude or Gemini key. No account, no servers. Export to Obsidian and Notion.">
 <meta property="og:url" content="https://smadgulkar.github.io/research-extension/">
-<meta property="og:image" content="https://smadgulkar.github.io/research-extension/screenshots/1-summary.png">
+<meta property="og:image" content="https://smadgulkar.github.io/research-extension/screenshots/1-ask.png">
 <meta name="twitter:card" content="summary_large_image">
 
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "Research Assistant",
+  "name": "Mindstack",
+  "alternateName": "Research Assistant",
   "applicationCategory": "BrowserApplication",
-  "applicationSubCategory": "AI webpage summarizer",
+  "applicationSubCategory": "AI knowledge base and webpage summarizer",
   "operatingSystem": "Chrome, Microsoft Edge, Firefox",
-  "description": "Free browser extension that summarizes webpages with OpenAI GPT, Anthropic Claude or Google Gemini using the user's own API key. No account and no servers: analyses are stored locally and can be exported to Obsidian, Notion, Markdown, JSON or HTML.",
+  "description": "Free browser extension that turns the webpages you read into a searchable AI knowledge base. Summaries, key points and Q&A across everything saved, using OpenAI GPT, Anthropic Claude or Google Gemini with the user's own API key. No account and no servers: data is stored locally and can be exported to Obsidian, Notion, Markdown, JSON or HTML.",
   "url": "https://smadgulkar.github.io/research-extension/",
   "downloadUrl": "https://chromewebstore.google.com/detail/research-assistant/idkghcjlmgaiodkjgfcfijjkdcoakanl",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "screenshot": [
-    "https://smadgulkar.github.io/research-extension/screenshots/1-summary.png",
-    "https://smadgulkar.github.io/research-extension/screenshots/3-export.png",
-    "https://smadgulkar.github.io/research-extension/screenshots/4-history.png"
+    "https://smadgulkar.github.io/research-extension/screenshots/1-ask.png",
+    "https://smadgulkar.github.io/research-extension/screenshots/2-summary.png",
+    "https://smadgulkar.github.io/research-extension/screenshots/4-history.png",
+    "https://smadgulkar.github.io/research-extension/screenshots/5-export.png"
   ],
   "featureList": [
+    "Personal knowledge base built from everything you analyze, with AI Q&A across it",
     "Summaries, key points, topics and sentiment for any webpage",
     "Works with OpenAI, Anthropic Claude and Google Gemini models using your own API key",
     "No account and no backend servers; data stays in your browser",
@@ -45,20 +48,24 @@
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
-    {"@type": "Question", "name": "Is Research Assistant free?",
+    {"@type": "Question", "name": "Is Mindstack free?",
      "acceptedAnswer": {"@type": "Answer", "text": "Yes. The extension is free, with no account, subscription or paid tier. You use your own API key from OpenAI, Anthropic or Google, and pay that provider directly for what you use. With smaller models that is usually well under a cent per page."}},
     {"@type": "Question", "name": "Is there an AI summarizer extension that saves to Obsidian?",
-     "acceptedAnswer": {"@type": "Answer", "text": "Yes. Research Assistant sends any analysis to your Obsidian vault as a note with YAML frontmatter, tags and wikilinks, and can also download Markdown files."}},
+     "acceptedAnswer": {"@type": "Answer", "text": "Yes. Mindstack sends any analysis to your Obsidian vault as a note with YAML frontmatter, tags and wikilinks, and can also download Markdown files."}},
     {"@type": "Question", "name": "Can I save webpage summaries to Notion?",
      "acceptedAnswer": {"@type": "Answer", "text": "Yes. Connect a Notion integration token in Settings, pick a database, and each analysis is saved as a page in that database."}},
     {"@type": "Question", "name": "Does it send my data to your servers?",
-     "acceptedAnswer": {"@type": "Answer", "text": "No. There are no Research Assistant servers. Page text goes straight from your browser to the AI provider you choose, and your history and knowledge base are stored locally in your browser."}},
+     "acceptedAnswer": {"@type": "Answer", "text": "No. There are no Mindstack servers. Page text goes straight from your browser to the AI provider you choose, and your history and knowledge base are stored locally in your browser."}},
     {"@type": "Question", "name": "Which AI models does it support?",
      "acceptedAnswer": {"@type": "Answer", "text": "OpenAI (GPT models), Anthropic (Claude models) and Google Gemini. The model list is fetched live from your provider, so new models appear automatically."}},
     {"@type": "Question", "name": "Do I need to create an account?",
      "acceptedAnswer": {"@type": "Answer", "text": "No. Install the extension, paste an API key in Settings and click Analyze on any page."}},
     {"@type": "Question", "name": "Does it work in Firefox and Edge?",
-     "acceptedAnswer": {"@type": "Answer", "text": "It is available for Chrome and Firefox, and works in Microsoft Edge and other Chromium browsers via the Chrome Web Store. A listing on Microsoft Edge Add-ons is coming."}}
+     "acceptedAnswer": {"@type": "Answer", "text": "It is available for Chrome and Firefox, and works in Microsoft Edge and other Chromium browsers via the Chrome Web Store. A listing on Microsoft Edge Add-ons is coming."}},
+    {"@type": "Question", "name": "Is Mindstack the same as Research Assistant?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Yes. Research Assistant was renamed Mindstack in November 2026. It is the same extension; existing installs update automatically and keep all saved research."}},
+    {"@type": "Question", "name": "Can I ask questions across articles I have read?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Yes. Every page you analyze is added to your knowledge base. Ask a question in the Knowledge tab and Mindstack answers from what you have saved, organized by workspace."}}
   ]
 }
 </script>
@@ -105,16 +112,16 @@
 <body>
 <div class="wrap">
   <header class="top">
-    <a class="logo" href="./"><img src="icon128.png" alt="">Research Assistant</a>
+    <a class="logo" href="./"><img src="icon128.png" alt="">Mindstack</a>
     <nav><a href="#features">Features</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a><a href="https://github.com/smadgulkar/research-extension">GitHub</a></nav>
   </header>
 
   <div class="hero">
     <div>
-      <h1>Summarize any webpage with AI. Save it to Obsidian or Notion.</h1>
-      <p class="lede">A free browser extension that turns long articles, docs and papers into summaries and key points, using GPT, Claude or Gemini with <strong>your own API key</strong>. No account. No servers. Your research stays in your browser.</p>
+      <h1>Everything you read, turned into a knowledge base you can ask.</h1>
+      <p class="lede">Mindstack is a free browser extension that captures the articles, docs and papers you read, distills each into summaries and key points, and builds a personal knowledge base you can search and question, using GPT, Claude or Gemini with <strong>your own API key</strong>. No account. No servers. Your knowledge stays in your browser.</p>
       <ul class="badges">
-        <li>Free, no paid tier</li><li>Bring your own key</li><li>No account</li><li>Local storage</li><li>Obsidian &amp; Notion export</li>
+        <li>Free, no paid tier</li><li>Personal knowledge base</li><li>Bring your own key</li><li>No account</li><li>Obsidian &amp; Notion export</li>
       </ul>
       <div class="cta">
         <a class="btn primary" id="chrome-link" href="https://chromewebstore.google.com/detail/research-assistant/idkghcjlmgaiodkjgfcfijjkdcoakanl">Add to Chrome</a>
@@ -122,28 +129,28 @@
         <a class="btn ghost disabled" aria-disabled="true">Edge: coming soon</a>
       </div>
     </div>
-    <img src="screenshots/popup-1-summary.png" alt="Research Assistant showing an AI summary of an article about vector databases" width="400" height="600">
+    <img src="screenshots/popup-1-ask.png" alt="Mindstack answering a question from the user's saved reading" width="400" height="600">
   </div>
 
   <section id="features">
     <h2>What it does</h2>
     <div class="grid3">
-      <div class="card"><h3>One-click summaries</h3><p>Summary, key points, topics and sentiment for the page you're reading.</p></div>
-      <div class="card"><h3>Your choice of AI</h3><p>OpenAI, Anthropic Claude or Google Gemini. Pick any model your key can use; the list updates itself.</p></div>
-      <div class="card"><h3>A research library</h3><p>Every analysis is saved and searchable, organized into workspaces, with Q&amp;A across everything you've read.</p></div>
+      <div class="card"><h3>A knowledge base that builds itself</h3><p>Every page you analyze becomes searchable knowledge, organized into workspaces by project or topic.</p></div>
+      <div class="card"><h3>Ask what you've read</h3><p>Ask a question and get an answer drawn from everything you've saved, not from the open web.</p></div>
+      <div class="card"><h3>One-click distillation</h3><p>Summary, key points, topics and sentiment for the page you're reading, with your choice of OpenAI, Claude or Gemini.</p></div>
       <div class="card"><h3>Obsidian export</h3><p>Send notes straight to your vault with YAML frontmatter, tags and wikilinks.</p></div>
       <div class="card"><h3>Notion export</h3><p>Save each analysis as a page in the Notion database you choose.</p></div>
-      <div class="card"><h3>Markdown, JSON, HTML</h3><p>Copy or download in the format your workflow needs.</p></div>
+      <div class="card"><h3>Markdown, JSON, HTML</h3><p>Copy or download in the format your workflow needs. Your knowledge is never locked in.</p></div>
     </div>
   </section>
 
   <section>
     <h2>See it in action</h2>
     <div class="shots">
-      <img src="screenshots/1-summary.png" alt="AI summary of a webpage" loading="lazy" width="1280" height="800">
-      <img src="screenshots/2-key-points.png" alt="Key points extracted from a webpage" loading="lazy" width="1280" height="800">
-      <img src="screenshots/3-export.png" alt="Export formats including Markdown, JSON, HTML and Obsidian" loading="lazy" width="1280" height="800">
-      <img src="screenshots/4-history.png" alt="Searchable history of analyzed pages" loading="lazy" width="1280" height="800">
+      <img src="screenshots/1-ask.png" alt="Asking a question across saved reading" loading="lazy" width="1280" height="800">
+      <img src="screenshots/2-summary.png" alt="AI summary of a webpage" loading="lazy" width="1280" height="800">
+      <img src="screenshots/4-history.png" alt="Knowledge base of analyzed pages" loading="lazy" width="1280" height="800">
+      <img src="screenshots/5-export.png" alt="Export formats including Markdown, JSON, HTML and Obsidian" loading="lazy" width="1280" height="800">
     </div>
   </section>
 
@@ -159,7 +166,7 @@
   <section id="privacy">
     <h2>Private by design</h2>
     <div class="grid3">
-      <div class="card"><h3>No servers</h3><p>There is no Research Assistant backend. Page text goes directly from your browser to the AI provider you choose.</p></div>
+      <div class="card"><h3>No servers</h3><p>There is no Mindstack backend. Page text goes directly from your browser to the AI provider you choose.</p></div>
       <div class="card"><h3>No tracking</h3><p>No analytics, no accounts, no data collection.</p></div>
       <div class="card"><h3>Stored locally</h3><p>History, knowledge base and settings live in your browser. Read the <a href="https://github.com/smadgulkar/research-extension/blob/main/PRIVACY.md">privacy policy</a>.</p></div>
     </div>
@@ -167,17 +174,19 @@
 
   <section id="faq">
     <h2>Questions</h2>
-    <details><summary>Is Research Assistant free?</summary><p>Yes. The extension is free, with no account, subscription or paid tier. You use your own API key from OpenAI, Anthropic or Google, and pay that provider directly for what you use. With smaller models that is usually well under a cent per page.</p></details>
-    <details><summary>Is there an AI summarizer extension that saves to Obsidian?</summary><p>Yes. Research Assistant sends any analysis to your Obsidian vault as a note with YAML frontmatter, tags and wikilinks, and can also download Markdown files.</p></details>
+    <details><summary>Is Mindstack free?</summary><p>Yes. The extension is free, with no account, subscription or paid tier. You use your own API key from OpenAI, Anthropic or Google, and pay that provider directly for what you use. With smaller models that is usually well under a cent per page.</p></details>
+    <details><summary>Is there an AI summarizer extension that saves to Obsidian?</summary><p>Yes. Mindstack sends any analysis to your Obsidian vault as a note with YAML frontmatter, tags and wikilinks, and can also download Markdown files.</p></details>
     <details><summary>Can I save webpage summaries to Notion?</summary><p>Yes. Connect a Notion integration token in Settings, pick a database, and each analysis is saved as a page in that database.</p></details>
-    <details><summary>Does it send my data to your servers?</summary><p>No. There are no Research Assistant servers. Page text goes straight from your browser to the AI provider you choose, and your history and knowledge base are stored locally in your browser.</p></details>
+    <details><summary>Does it send my data to your servers?</summary><p>No. There are no Mindstack servers. Page text goes straight from your browser to the AI provider you choose, and your history and knowledge base are stored locally in your browser.</p></details>
     <details><summary>Which AI models does it support?</summary><p>OpenAI (GPT models), Anthropic (Claude models) and Google Gemini. The model list is fetched live from your provider, so new models appear automatically.</p></details>
     <details><summary>Do I need to create an account?</summary><p>No. Install the extension, paste an API key in Settings and click Analyze on any page.</p></details>
     <details><summary>Does it work in Firefox and Edge?</summary><p>It is available for Chrome and Firefox, and works in Microsoft Edge and other Chromium browsers via the Chrome Web Store. A listing on Microsoft Edge Add-ons is coming.</p></details>
+    <details><summary>Can I ask questions across articles I have read?</summary><p>Yes. Every page you analyze is added to your knowledge base. Ask a question in the Knowledge tab and Mindstack answers from what you have saved, organized by workspace.</p></details>
+    <details><summary>Is Mindstack the same as Research Assistant?</summary><p>Yes. Research Assistant was renamed Mindstack in November 2026. It is the same extension; existing installs update automatically and keep all saved research.</p></details>
   </section>
 
   <footer>
-    Research Assistant &middot; <a href="https://github.com/smadgulkar/research-extension">Source on GitHub</a> &middot; <a href="https://github.com/smadgulkar/research-extension/blob/main/PRIVACY.md">Privacy policy</a> &middot; <a href="https://github.com/smadgulkar/research-extension/issues">Report a problem</a>
+    Mindstack (formerly Research Assistant) &middot; <a href="https://github.com/smadgulkar/research-extension">Source on GitHub</a> &middot; <a href="https://github.com/smadgulkar/research-extension/blob/main/PRIVACY.md">Privacy policy</a> &middot; <a href="https://github.com/smadgulkar/research-extension/issues">Report a problem</a>
   </footer>
 </div>
 </body>

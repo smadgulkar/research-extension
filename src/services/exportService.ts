@@ -74,7 +74,7 @@ class ExportService {
     }
 
     lines.push('---');
-    lines.push('*Exported with Research Assistant*');
+    lines.push('*Exported with Mindstack*');
 
     return lines.join('\n');
   }
@@ -90,7 +90,7 @@ class ExportService {
       sentiment: data.sentiment,
       analyzedAt: data.timestamp || new Date().toISOString(),
       exportedAt: new Date().toISOString(),
-      source: 'Research Assistant'
+      source: 'Mindstack'
     }, null, 2);
   }
 
@@ -143,7 +143,7 @@ class ExportService {
 
   ${data.sentiment ? `<div class="sentiment"><strong>Sentiment:</strong> ${this.escapeHtml(data.sentiment)}</div>` : ''}
 
-  <footer>Exported with Research Assistant</footer>
+  <footer>Exported with Mindstack</footer>
 </body>
 </html>`;
   }

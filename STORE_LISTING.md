@@ -1,19 +1,19 @@
 # Chrome Web Store Listing Content
 
 ## Extension Name
-**Research Assistant** (or "Research Assistant - AI Page Analyzer")
+**Mindstack – AI knowledge base & summarizer** (set from the manifest `name`; max 45 characters: Firefox manifest limit. Formerly "Research Assistant".)
 
 ## Short Description (132 characters max)
 ```
-Summarize any webpage with AI, save insights to a searchable knowledge base, export to Notion or Obsidian. GPT, Claude, Gemini.
+Turn what you read into a searchable AI knowledge base. Summaries & Q&A via GPT, Claude or Gemini. Export to Obsidian & Notion.
 ```
 
 ## Detailed Description
 
 ```
-🧠 Research Assistant - Your AI-Powered Research Companion
+🧠 Mindstack: everything you read, turned into a knowledge base you can ask
 
-Transform how you consume online content. Research Assistant uses AI to instantly analyze any webpage, giving you summaries, key points, and insights in seconds.
+Mindstack (formerly Research Assistant) captures the articles, docs and papers you read, distills each into a summary and key points with AI, and builds a personal knowledge base you can search and question. Bring your own OpenAI, Claude or Gemini key. No account, no servers.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -47,7 +47,7 @@ Transform how you consume online content. Research Assistant uses AI to instantl
 🚀 GETTING STARTED
 
 1. Install the extension
-2. Click the Research Assistant icon
+2. Click the Mindstack icon
 3. Add your OpenAI, Anthropic or Gemini API key in Settings
 4. Navigate to any webpage and click "Analyze Page"
 
@@ -79,7 +79,7 @@ Having issues? We're here to help!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Research Assistant respects your privacy. We don't collect any personal data, and your API keys never leave your device. Read our full privacy policy for details.
+Mindstack respects your privacy. We don't collect any personal data, and your API keys never leave your device. Read our full privacy policy for details.
 
 
 Made with ❤️ for researchers everywhere.
@@ -132,15 +132,15 @@ Show the workspace manager with multiple workspaces organized by project.
 
 ### Small Tile (440x280)
 ```
-Research Assistant
-AI-Powered Page Analysis
+Mindstack
+Everything you read, remembered
 ```
 
 ### Marquee (1400x560)
 ```
-Research Assistant
-Analyze any webpage with AI
-Build your personal knowledge base
+Mindstack
+Turn what you read into a knowledge base
+Ask questions across everything you've saved
 ```
 
 ---

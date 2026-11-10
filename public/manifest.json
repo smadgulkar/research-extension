@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Research Assistant",
+  "name": "Mindstack – AI knowledge base & summarizer",
   "version": "2.0.0",
-  "description": "Summarize any webpage with AI, save insights to a searchable knowledge base, export to Notion or Obsidian. GPT, Claude, Gemini.",
+  "description": "Turn what you read into a searchable AI knowledge base. Summaries & Q&A via GPT, Claude or Gemini. Export to Obsidian & Notion.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -22,7 +22,8 @@
       "16": "icon16.png",
       "48": "icon48.png",
       "128": "icon128.png"
-    }
+    },
+    "default_title": "Mindstack"
   },
   "background": {
     "service_worker": "background.js",
@@ -54,5 +55,6 @@
       ],
       "matches": []
     }
-  ]
+  ],
+  "short_name": "Mindstack"
 }

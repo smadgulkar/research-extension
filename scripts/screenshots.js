@@ -57,13 +57,21 @@ const ARTICLES = {
   },
 };
 
+// Chrome Web Store accepts at most 5 screenshots: upload 1-5 there; 6 is extra for AMO.
 const SHOTS = [
-  { file: '1-summary.png', caption: 'Summarize any page in one click', sub: 'Clear summaries from GPT, Claude or Gemini, using your own API key.' },
-  { file: '2-key-points.png', caption: 'Key points, topics and sentiment', sub: 'Get the substance of long articles, docs and papers in seconds.' },
-  { file: '3-export.png', caption: 'Export to Obsidian, Notion and more', sub: 'Markdown, JSON, HTML, Obsidian with frontmatter, or straight into a Notion database.' },
-  { file: '4-history.png', caption: 'A searchable research library', sub: 'Every analysis is saved in your browser and organized into workspaces.' },
-  { file: '5-settings.png', caption: 'Your AI, your key, your data', sub: 'No account and no servers. Requests go straight from your browser to the provider you choose.' },
+  { file: '1-ask.png', caption: 'Ask everything you\'ve read', sub: 'Answers come from your own saved reading, not the open web.' },
+  { file: '2-summary.png', caption: 'Distill any page in one click', sub: 'Summaries from GPT, Claude or Gemini, using your own API key.' },
+  { file: '3-key-points.png', caption: 'Key points, topics and sentiment', sub: 'Get the substance of long articles, docs and papers in seconds.' },
+  { file: '4-history.png', caption: 'A knowledge base that builds itself', sub: 'Every page you analyze is saved, searchable and organized into workspaces.' },
+  { file: '5-export.png', caption: 'Export to Obsidian, Notion and more', sub: 'Markdown, JSON, HTML, Obsidian with frontmatter, or straight into a Notion database.' },
+  { file: '6-settings.png', caption: 'Your AI, your key, your data', sub: 'No account and no servers. Requests go straight from your browser to the provider you choose.' },
 ];
+
+const QUESTION = 'What matters most when choosing a vector database?';
+const ANSWER =
+  'Based on your saved reading, how you prepare data matters more than which database you pick. ' +
+  'Chunk size and the distance metric drive retrieval quality, while HNSW-style indexes keep search fast at scale. ' +
+  'Managed services cost more but save operational work.';
 
 function articleHtml({ title, body }) {
   return `<!doctype html><html><head><title>${title}</title></head><body><article><h1>${title}</h1><p>${body.repeat(25)}</p></article></body></html>`;
@@ -115,6 +123,8 @@ async function main() {
         const prompt = req.postData() || '';
         const key = Object.keys(ARTICLES).find((k) => prompt.includes(k)) || '/tidal-energy';
         const a = ARTICLES[key].analysis;
+        if (prompt.includes('Find the most relevant items')) return json({ choices: [{ message: { content: '[]' } }] });
+        if (prompt.includes('Please provide a comprehensive answer')) return json({ choices: [{ message: { content: ANSWER } }] });
         const content = prompt.includes('key knowledge points')
           ? JSON.stringify(a.keyPoints.slice(0, 3).map((k) => ({ topic: a.topics[0], content: k, confidence: 0.9 })))
           : JSON.stringify(a);
@@ -148,7 +158,7 @@ async function main() {
     await page.type('input[type="password"]', 'sk-xxxxxxxxxxxxxxxxxxxxxxxx');
     await page.waitForSelector('option[value="gpt-4o"]');
     await settle();
-    captures['5-settings.png'] = await page.screenshot();
+    captures['6-settings.png'] = await page.screenshot();
     await clickText('Save Settings');
 
     // Analyze three articles; the last one is the one shown in the results shots.
@@ -176,19 +186,33 @@ async function main() {
     }
 
     await settle();
-    captures['1-summary.png'] = await page.screenshot();
+    captures['2-summary.png'] = await page.screenshot();
     await clickText('Key Points');
     await settle();
-    captures['2-key-points.png'] = await page.screenshot();
+    captures['3-key-points.png'] = await page.screenshot();
     await clickText('Markdown');
     await settle();
-    captures['3-export.png'] = await page.screenshot();
+    captures['5-export.png'] = await page.screenshot();
     await page.keyboard.press('Escape');
     await closeResults();
     await clickText('History');
     await page.waitForFunction((t) => document.body.innerText.includes(t), { timeout: 5000 }, "Beginner's Guide");
     await settle();
     captures['4-history.png'] = await page.screenshot();
+
+    // Knowledge Q&A across everything saved.
+    await clickText('Knowledge');
+    await page.waitForSelector('input[placeholder="Search or ask a question..."]');
+    await page.type('input[placeholder="Search or ask a question..."]', QUESTION);
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.body.innerText.includes('Based on your saved reading'), { timeout: 15000 });
+    // Show the start of the question, without a caret.
+    await page.evaluate(() => {
+      const i = document.querySelector('input[placeholder="Search or ask a question..."]');
+      i.setSelectionRange(0, 0); i.scrollLeft = 0; i.blur();
+    });
+    await settle();
+    captures['1-ask.png'] = await page.screenshot();
 
     // Compose each capture onto a captioned 1280x800 canvas.
     const canvas = await browser.newPage();
@@ -204,7 +228,7 @@ async function main() {
         p{font-size:24px;line-height:1.45;color:#3f3f68;margin:0}
         .frame{width:400px;height:600px;border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -12px rgba(30,27,75,.35),0 0 0 1px rgba(30,27,75,.08);background:#fff;flex:none}
         .frame img{width:400px;height:600px;display:block}
-      </style></head><body><div class="text"><div class="brand">Research Assistant</div><h1>${shot.caption}</h1><p>${shot.sub}</p></div>
+      </style></head><body><div class="text"><div class="brand">Mindstack</div><h1>${shot.caption}</h1><p>${shot.sub}</p></div>
       <div class="frame"><img src="data:image/png;base64,${img}"></div></body></html>`);
       await canvas.evaluate(() => Promise.all([...document.images].map((i) => i.decode())));
       await canvas.screenshot({ path: path.join(OUT_DIR, shot.file) });

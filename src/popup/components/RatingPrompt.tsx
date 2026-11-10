@@ -50,7 +50,7 @@ const RatingPrompt: React.FC<RatingPromptProps> = ({ onDone }) => {
     >
       <Star size={18} className="text-amber-500 mt-0.5 shrink-0" />
       <div className="flex-1">
-        <p className="text-sm text-gray-800">Finding Research Assistant useful? A quick rating helps others find it.</p>
+        <p className="text-sm text-gray-800">Finding Mindstack useful? A quick rating helps others find it.</p>
         <div className="mt-2 flex gap-2">
           <button
             onClick={() => finish(true)}

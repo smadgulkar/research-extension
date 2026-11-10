@@ -10,7 +10,7 @@ const STEPS = [
   {
     id: 'welcome',
     icon: Sparkles,
-    title: 'Welcome to Research Assistant',
+    title: 'Welcome to Mindstack',
     description: 'Your AI-powered companion for understanding web content. Analyze any page, extract key insights, and build your personal knowledge base.',
     color: 'blue',
   },
