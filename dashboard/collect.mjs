@@ -98,10 +98,13 @@ function collectSecrets() {
   }
 }
 
-// Tolerant parser for the Chrome dashboard "Users" CSV export: finds a date column
-// and the weekly-users column by header name. Returns { 'YYYY-MM-DD': users }.
-function parseChromeCsv(text) {
-  const rows = text.trim().split(/\r?\n/).map((line) => {
+// Chrome dashboard CSV exports look like:
+//   Weekly users over time          <- title line
+//   Date,Users                      <- header
+//   10/11/26,100                    <- M/D/YY rows
+// Each Analytics chart exports its own file; the title line says which one.
+function parseCsvRows(text) {
+  return text.replace(/^﻿/, '').trim().split(/\r?\n/).map((line) => {
     const cells = []; let cur = ''; let q = false;
     for (const ch of line) {
       if (ch === '"') q = !q;
@@ -111,26 +114,54 @@ function parseChromeCsv(text) {
     cells.push(cur);
     return cells.map((c) => c.trim());
   });
-  const header = rows[0].map((h) => h.toLowerCase());
-  const dateCol = header.findIndex((h) => h.includes('date') || h === 'day' || h === 'week');
-  let usersCol = header.findIndex((h) => /user/.test(h) && !/region|language|os|version|enabled|disabled/.test(h));
-  if (usersCol === -1) usersCol = header.length > 1 ? 1 : -1;
-  if (dateCol === -1 || usersCol === -1) return {};
-  const out = {};
-  for (const r of rows.slice(1)) {
-    const d = new Date(r[dateCol]);
-    const v = num(r[usersCol]);
-    if (!isNaN(d) && Number.isFinite(v)) out[d.toISOString().slice(0, 10)] = v;
-  }
-  return out;
 }
 
+// "10/11/26" or "10/11/2026" -> "2026-10-11" (parsed by hand: no timezone shifts).
+function isoDate(s) {
+  const m = String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+  if (m) {
+    const y = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+    return `${y}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
+  }
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
+function parseChromeExport(text) {
+  const rows = parseCsvRows(text);
+  const headerIdx = rows.findIndex((r) => r[0]?.toLowerCase() === 'date');
+  if (headerIdx === -1) return null;
+  const title = headerIdx > 0 ? rows[0].join(',').toLowerCase() : '';
+  const header = rows[headerIdx].slice(1);
+  const data = rows.slice(headerIdx + 1)
+    .map((r) => ({ date: isoDate(r[0]), values: r.slice(1).map(num) }))
+    .filter((r) => r.date && r.values.every(Number.isFinite));
+  return { title, header, data };
+}
+
+// Dashboard exports may be saved in dashboard/data/chrome-csv/ or the repo's data/ folder.
+const CSV_DIRS = [CSV_DIR, path.join(HERE, '..', 'data')];
+
 async function readChromeCsvs() {
-  if (!existsSync(CSV_DIR)) return { points: {}, files: [] };
-  const files = (await readdir(CSV_DIR)).filter((f) => f.toLowerCase().endsWith('.csv'));
-  const points = {};
-  for (const f of files) Object.assign(points, parseChromeCsv(await readFile(path.join(CSV_DIR, f), 'utf8')));
-  return { points, files };
+  const points = {}; const files = []; let versions = null;
+  for (const dir of CSV_DIRS) {
+    if (!existsSync(dir)) continue;
+    for (const f of (await readdir(dir)).filter((n) => n.toLowerCase().endsWith('.csv'))) {
+      const parsed = parseChromeExport(await readFile(path.join(dir, f), 'utf8'));
+      if (!parsed) continue;
+      const isWeekly = parsed.title.includes('weekly users over time') ||
+        (!parsed.title && parsed.header.length === 1 && /users/i.test(parsed.header[0]));
+      if (isWeekly) {
+        for (const r of parsed.data) points[r.date] = r.values[0];
+        files.push(f);
+      } else if (parsed.title.includes('daily users by item version') && parsed.data.length) {
+        const last = parsed.data[parsed.data.length - 1];
+        if (!versions || last.date > versions.date) {
+          versions = { date: last.date, byVersion: Object.fromEntries(parsed.header.map((h, i) => [h, last.values[i]])) };
+        }
+      }
+    }
+  }
+  return { points, files, versions };
 }
 
 const DEFAULT_TASKS = [
@@ -206,7 +237,7 @@ async function main() {
 
   const model = {
     generatedAt: new Date().toISOString(),
-    latest: snap, history: newHistory, chromeCsv: csv.points, chromeCsvFiles: csv.files,
+    latest: snap, history: newHistory, chromeCsv: csv.points, chromeCsvFiles: csv.files, chromeVersions: csv.versions,
     secrets, errors, tasks: taskView,
     links: { chrome: CHROME_URL, firefox: AMO_URL, edge: config.edgeStoreUrl || null },
   };

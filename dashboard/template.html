@@ -148,6 +148,13 @@ function render() {
         <dl>
           <dt>Rating</dt><dd>${L.chrome ? ratingText(L.chrome.rating, L.chrome.ratingCount) : 'n/a'}</dd>
           <dt>Live version</dt><dd>${esc(L.chrome?.version ?? 'n/a')}${L.chrome?.updated ? ` <span class="note">updated ${esc(L.chrome.updated)}</span>` : ''}</dd>
+          ${(() => {
+            const v = DATA.chromeVersions; if (!v) return '';
+            const entries = Object.entries(v.byVersion).filter(([, n]) => n > 0)
+              .sort((a, b) => b[0].localeCompare(a[0], undefined, { numeric: true }));
+            const total = entries.reduce((s, [, n]) => s + n, 0); if (!total) return '';
+            return `<dt>Version adoption</dt><dd>${entries.map(([ver, n]) => `${esc(ver.replace(/\.0$/, ''))}: ${Math.round(n / total * 100)}%`).join(' · ')} <span class="note">daily users, ${v.date}</span></dd>`;
+          })()}
           <dt>Listing</dt><dd><a href="${DATA.links.chrome}">Open store page</a></dd>
         </dl>
       </div>
@@ -198,7 +205,7 @@ function render() {
       </div>
       <div class="card">
         <h2>Chrome CSV import</h2>
-        <p class="sub" style="margin-top:0">For exact weekly users: Chrome dashboard → Mindstack → <b>Analytics → Users</b> → export CSV, then save it into <code>dashboard/data/chrome-csv/</code> and re-run.</p>
+        <p class="sub" style="margin-top:0">For exact weekly users: Chrome dashboard → Mindstack → <b>Analytics → Users</b> → export CSV, then save it into the repo's <code>data/</code> folder (or <code>dashboard/data/chrome-csv/</code>) and re-run. The "Weekly users over time" and "Daily users by item version" files are used.</p>
         <div class="note">${DATA.chromeCsvFiles.length ? `Loaded ${DATA.chromeCsvFiles.length} file(s), ${Object.keys(DATA.chromeCsv).length} dated points: ${DATA.chromeCsvFiles.map(esc).join(', ')}` : 'No CSV loaded yet.'}</div>
         ${DATA.chromeCsvFiles.length && !Object.keys(DATA.chromeCsv).length ? '<div class="banner" style="margin-top:10px">CSV found but no rows could be read. The column names may differ from what the parser expects.</div>' : ''}
       </div>
@@ -220,7 +227,7 @@ function render() {
 function niceMax(v) {
   if (v <= 5) return 5;
   const p = Math.pow(10, Math.floor(Math.log10(v)));
-  for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p;
+  for (const m of [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p;
   return 10 * p;
 }
 
