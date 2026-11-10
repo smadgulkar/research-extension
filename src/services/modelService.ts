@@ -1,4 +1,5 @@
 import type { LLMSettings } from '@/types/models';
+import { GEMINI_PREFERRED_MODELS, isGeminiTextModel, rankGeminiModels } from './geminiModels';
 
 interface Model {
   id: string;
@@ -128,7 +129,7 @@ export class ModelService {
   private async getGeminiModels(): Promise<Model[]> {
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${this.settings.apiKey}`
+        `https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${encodeURIComponent(this.settings.apiKey)}`
       );
 
       if (!response.ok) {
@@ -138,25 +139,22 @@ export class ModelService {
       const data = await response.json();
 
       // Filter for text generation models
-      const models = data.models
-        .filter((model: any) => {
-          const name = model.name.toLowerCase();
-          // Include gemini models that support content generation
-          return name.includes('gemini') &&
-                 model.supportedGenerationMethods?.includes('generateContent');
-        })
-        .map((model: any) => ({
-          id: model.name.replace('models/', ''),
-          name: model.displayName || this.formatGeminiModelName(model.name),
-          description: model.description
-        }))
-        // Sort by name to group similar models
-        .sort((a: Model, b: Model) => {
-          // Prioritize newer versions (2.0, 1.5, 1.0)
-          const aVersion = a.id.match(/(\d+\.\d+)/)?.[1] || '0';
-          const bVersion = b.id.match(/(\d+\.\d+)/)?.[1] || '0';
-          return parseFloat(bVersion) - parseFloat(aVersion);
-        });
+      // Text models that support generateContent. The first entry becomes the
+      // default, so free-tier Flash models are ranked first (Gemini 4 is paid only).
+      const models: Model[] = rankGeminiModels(
+        (data.models || [])
+          .filter((model: any) => {
+            const id = model.name.replace('models/', '');
+            return id.toLowerCase().includes('gemini') &&
+                   isGeminiTextModel(id) &&
+                   model.supportedGenerationMethods?.includes('generateContent');
+          })
+          .map((model: any) => ({
+            id: model.name.replace('models/', ''),
+            name: model.displayName || this.formatGeminiModelName(model.name),
+            description: model.description
+          }))
+      );
 
       return models.length > 0 ? models : this.getFallbackModels();
     } catch (error) {
@@ -192,13 +190,7 @@ export class ModelService {
           { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
         ];
       case 'gemini':
-        return [
-          { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
-          { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite' },
-          { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-          { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-          { id: 'gemini-1.5-flash-8b', name: 'Gemini 1.5 Flash 8B' },
-        ];
+        return GEMINI_PREFERRED_MODELS.map((id) => ({ id, name: this.formatGeminiModelName(id) }));
       default:
         return [];
     }

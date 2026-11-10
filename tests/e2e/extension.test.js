@@ -108,13 +108,23 @@ async function installProviderMocks(page) {
     }
     if (url.startsWith('https://generativelanguage.googleapis.com/') && url.includes('/models?')) {
       record('gemini');
-      return json({ models: [{ name: 'models/gemini-test-flash', displayName: 'Gemini Test Flash', supportedGenerationMethods: ['generateContent'] }] });
+      // Paid-only and non-text models come first; the free Flash model must still be the default.
+      const gen = ['generateContent'];
+      return json({
+        models: [
+          { name: 'models/gemini-4-carbon', displayName: 'Gemini 4 Carbon', supportedGenerationMethods: gen },
+          { name: 'models/gemini-3.8-flash-tts', displayName: 'Gemini 3.8 Flash TTS', supportedGenerationMethods: gen },
+          { name: 'models/gemini-embedding-2', displayName: 'Embedding', supportedGenerationMethods: ['embedContent'] },
+          { name: 'models/gemini-3.6-flash', displayName: 'Gemini 3.6 Flash', supportedGenerationMethods: gen },
+        ],
+      });
     }
     if (url.startsWith('https://generativelanguage.googleapis.com/') && url.includes(':generateContent')) {
       record('gemini');
       // Prose around the JSON, as Gemini sometimes does.
       const text = 'Here is the analysis:\n' + JSON.stringify(isKnowledge ? KNOWLEDGE : ANALYSIS);
-      return json({ candidates: [{ content: { parts: [{ text }] } }] });
+      // A thought-summary part comes first, as Gemini 3 thinking models can return.
+      return json({ candidates: [{ content: { parts: [{ text: 'THOUGHT_SHOULD_BE_SKIPPED', thought: true }, { text }] } }] });
     }
     return req.continue();
   });
@@ -259,7 +269,7 @@ describe('Anthropic requests', () => {
 describe.each([
   ['openai', 'gpt-4o', 'plain JSON'],
   ['anthropic', 'claude-sonnet-5-5', 'JSON in ```json fences'],
-  ['gemini', 'gemini-test-flash', 'JSON after prose'],
+  ['gemini', 'gemini-3.6-flash', 'JSON after prose'],
 ])('Analyze flow with %s', (provider, modelId, format) => {
   test(`summarizes the page and saves it (${format})`, async () => {
     const { page, calls, problems } = await openPopup();
@@ -296,6 +306,51 @@ describe.each([
         })
     );
     expect(saved).toContain(FIXTURE_TITLE);
+  });
+});
+
+describe('Free Gemini key', () => {
+  test('new installs default to Gemini and show the free-key hint until a key is entered', async () => {
+    const { page, problems } = await openPopup();
+    await skipOnboarding(page);
+    await page.click('[aria-label="Settings"]');
+    const providerSelect = 'select:has(option[value="anthropic"])';
+    await page.waitForSelector(providerSelect);
+    expect(await page.$eval(providerSelect, (s) => s.value)).toBe('gemini');
+    await page.waitForSelector('[data-testid="free-key-hint"]');
+    expect(await page.$eval('[data-testid="free-key-hint"] a', (a) => a.href)).toBe('https://aistudio.google.com/app/apikey');
+
+    // Another provider offers a one-click switch back to Gemini.
+    await page.select(providerSelect, 'openai');
+    await page.waitForSelector('[data-testid="free-key-switch"] button');
+    await page.click('[data-testid="free-key-switch"] button');
+    await page.waitForSelector('[data-testid="free-key-hint"]');
+    expect(await page.$eval(providerSelect, (s) => s.value)).toBe('gemini');
+
+    // Hidden once a key is typed.
+    await page.type('input[type="password"]', 'test-key-gemini');
+    await page.waitForFunction(() => !document.querySelector('[data-testid="free-key-hint"]'));
+    expect(problems.pageErrors).toEqual([]);
+  });
+
+  test('auto-picks a free Flash model, never paid Gemini 4 or non-text models', async () => {
+    const { page } = await openPopup();
+    await skipOnboarding(page);
+    await page.click('[aria-label="Settings"]');
+    const providerSelect = 'select:has(option[value="anthropic"])';
+    await page.waitForSelector(providerSelect);
+    // Start from another provider so switching to Gemini picks from the fetched list.
+    await page.select(providerSelect, 'openai');
+    await page.type('input[type="password"]', 'test-key');
+    await page.waitForSelector('option[value="gpt-4o"]');
+    await page.select(providerSelect, 'gemini');
+    await page.waitForSelector('option[value="gemini-3.6-flash"]');
+    const modelSelect = 'select:has(option[value="gemini-3.6-flash"])';
+    const options = await page.$$eval(`${modelSelect} option`, (os) => os.map((o) => o.value));
+    expect(options[0]).toBe('gemini-3.6-flash');
+    expect(options).not.toContain('gemini-3.8-flash-tts');
+    expect(options).not.toContain('gemini-embedding-2');
+    expect(await page.$eval(modelSelect, (s) => s.value)).toBe('gemini-3.6-flash');
   });
 });
 

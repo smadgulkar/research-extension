@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BookOpen, Brain, History, Lightbulb, Key, ArrowRight, Check, Sparkles } from 'lucide-react';
+import { GEMINI_KEY_URL } from '@/services/geminiModels';
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -39,7 +40,7 @@ const STEPS = [
     id: 'setup',
     icon: Key,
     title: 'Quick Setup',
-    description: 'To get started, you\'ll need an API key from OpenAI or Anthropic. This powers the AI analysis and stays securely on your device.',
+    description: 'Mindstack uses your own AI key, which stays on your device. Don\'t have one? Google Gemini has a free tier.',
     color: 'indigo',
     isSetup: true,
   },
@@ -116,17 +117,25 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onOpenSettings }) =
             <ul className="text-sm text-gray-600 space-y-1">
               <li className="flex items-center gap-2">
                 <Check size={14} className="text-green-500" />
-                OpenAI (GPT-4o, GPT-4)
+                <span>
+                  Google Gemini: free tier,{' '}
+                  <a href={GEMINI_KEY_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    get a key
+                  </a>
+                </span>
               </li>
               <li className="flex items-center gap-2">
                 <Check size={14} className="text-green-500" />
-                Anthropic (Claude 3.5)
+                OpenAI (GPT)
               </li>
               <li className="flex items-center gap-2">
                 <Check size={14} className="text-green-500" />
-                Google (Gemini 1.5)
+                Anthropic (Claude)
               </li>
             </ul>
+            <p className="text-xs text-gray-500 mt-2">
+              On Gemini's free tier, Google may use what you send to improve its products.
+            </p>
           </div>
         )}
       </div>

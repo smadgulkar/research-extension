@@ -48,7 +48,7 @@ Mindstack (formerly Research Assistant) captures the articles, docs and papers y
 
 1. Install the extension
 2. Click the Mindstack icon
-3. Add your OpenAI, Anthropic or Gemini API key in Settings
+3. Add your API key in Settings. No key? Get a free Gemini key from Google AI Studio (free tier with daily limits)
 4. Navigate to any webpage and click "Analyze Page"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -65,7 +65,7 @@ Mindstack (formerly Research Assistant) captures the articles, docs and papers y
 
 🔑 REQUIREMENTS
 
-• An API key from OpenAI, Anthropic or Google Gemini (bring your own key)
+• An API key from OpenAI, Anthropic or Google Gemini (bring your own key; Gemini has a free tier)
 • Chrome browser (Manifest V3 compatible)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

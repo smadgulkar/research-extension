@@ -21,6 +21,8 @@ import PremiumSettings from './components/PremiumSettings';
 import RatingPrompt, { recordSuccessfulAnalysis, shouldShowRatingPrompt } from './components/RatingPrompt';
 import NotionSettings from './components/NotionSettings';
 import Onboarding from './components/Onboarding';
+import FreeKeyHint from './components/FreeKeyHint';
+import { GEMINI_DEFAULT_MODEL } from '@/services/geminiModels';
 import { premiumService, PAID_TIER_ENABLED } from '../services/premiumService';
 
 const ONBOARDING_KEY = 'research_assistant_onboarding_complete';
@@ -57,9 +59,10 @@ interface FilterOptions {
 
 const DEFAULT_SETTINGS: SettingsType = {
   id: 'llm',
-  provider: 'openai',
+  // Gemini is the default for new installs because Google offers a free tier.
+  provider: 'gemini',
   apiKey: '',
-  model: 'gpt-4'
+  model: GEMINI_DEFAULT_MODEL
 };
 
 const TabButton: React.FC<TabButtonProps> = ({ id, icon: Icon, label, activeTab, onTabChange }) => (
@@ -235,8 +238,7 @@ const App: React.FC = () => {
     
     // Check if provider is set
     if (!settings.provider) {
-      // Default to OpenAI if not set
-      setSettings({...settings, provider: 'openai'});
+      setSettings({...settings, provider: 'gemini'});
     }
     
     setIsLoading(true);
@@ -726,6 +728,13 @@ const App: React.FC = () => {
                       placeholder={`Enter your ${settings.provider} API key`}
                     />
                   </div>
+
+                  {!settings.apiKey && (
+                    <FreeKeyHint
+                      provider={settings.provider}
+                      onUseGemini={() => handleProviderChange('gemini')}
+                    />
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">

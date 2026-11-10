@@ -16,6 +16,7 @@ Mindstack captures the articles, docs and papers you read, distills each one int
 - **Ask what you've read:** Q&A across everything you've saved, not the open web
 - **One-click distillation:** summary, key points, topics and sentiment for the page you're reading
 - **Your choice of AI:** OpenAI, Anthropic Claude or Google Gemini; the model list is fetched live from your provider
+- **Free to start:** Gemini's free tier works with Mindstack ([get a key](https://aistudio.google.com/app/apikey)); on the free tier Google may use your inputs to improve its products
 - **Obsidian export:** notes with YAML frontmatter, tags and wikilinks, sent straight to your vault
 - **Notion export:** each analysis saved as a page in the database you choose
 - **Markdown, JSON and HTML** copy and download

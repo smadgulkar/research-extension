@@ -49,7 +49,7 @@
   "@type": "FAQPage",
   "mainEntity": [
     {"@type": "Question", "name": "Is Mindstack free?",
-     "acceptedAnswer": {"@type": "Answer", "text": "Yes. The extension is free, with no account, subscription or paid tier. You use your own API key from OpenAI, Anthropic or Google, and pay that provider directly for what you use. With smaller models that is usually well under a cent per page."}},
+     "acceptedAnswer": {"@type": "Answer", "text": "Yes. The extension is free, with no account, subscription or paid tier. You use your own API key. Google Gemini has a free tier with daily limits: create a key in Google AI Studio and paste it into Settings. On the free tier Google may use what you send to improve its products, and it isn't available in every country. With OpenAI or Anthropic you pay the provider directly, usually well under a cent per page with smaller models."}},
     {"@type": "Question", "name": "Is there an AI summarizer extension that saves to Obsidian?",
      "acceptedAnswer": {"@type": "Answer", "text": "Yes. Mindstack sends any analysis to your Obsidian vault as a note with YAML frontmatter, tags and wikilinks, and can also download Markdown files."}},
     {"@type": "Question", "name": "Can I save webpage summaries to Notion?",
@@ -121,7 +121,7 @@
       <h1>Everything you read, turned into a knowledge base you can ask.</h1>
       <p class="lede">Mindstack is a free browser extension that captures the articles, docs and papers you read, distills each into summaries and key points, and builds a personal knowledge base you can search and question, using GPT, Claude or Gemini with <strong>your own API key</strong>. No account. No servers. Your knowledge stays in your browser.</p>
       <ul class="badges">
-        <li>Free, no paid tier</li><li>Personal knowledge base</li><li>Bring your own key</li><li>No account</li><li>Obsidian &amp; Notion export</li>
+        <li>Free, no paid tier</li><li>Works with Gemini's free tier</li><li>Personal knowledge base</li><li>Bring your own key</li><li>No account</li><li>Obsidian &amp; Notion export</li>
       </ul>
       <div class="cta">
         <a class="btn primary" id="chrome-link" href="https://chromewebstore.google.com/detail/research-assistant/idkghcjlmgaiodkjgfcfijjkdcoakanl">Add to Chrome</a>
@@ -158,7 +158,7 @@
     <h2>Get started in a minute</h2>
     <ol class="steps">
       <li>Install the extension for Chrome or Firefox.</li>
-      <li>Open Settings, pick OpenAI, Anthropic or Gemini, and paste your API key.</li>
+      <li>Open Settings and paste an API key. No key? Gemini is the default and has a free tier: <a href="https://aistudio.google.com/app/apikey">get a free key from Google AI Studio</a>.</li>
       <li>On any article, click the extension icon and press <strong>Analyze Page</strong>.</li>
     </ol>
   </section>
@@ -174,7 +174,7 @@
 
   <section id="faq">
     <h2>Questions</h2>
-    <details><summary>Is Mindstack free?</summary><p>Yes. The extension is free, with no account, subscription or paid tier. You use your own API key from OpenAI, Anthropic or Google, and pay that provider directly for what you use. With smaller models that is usually well under a cent per page.</p></details>
+    <details><summary>Is Mindstack free?</summary><p>Yes. The extension is free, with no account, subscription or paid tier. You use your own API key. Google Gemini has a free tier with daily limits: create a key in Google AI Studio and paste it into Settings. On the free tier Google may use what you send to improve its products, and it isn't available in every country. With OpenAI or Anthropic you pay the provider directly, usually well under a cent per page with smaller models.</p></details>
     <details><summary>Is there an AI summarizer extension that saves to Obsidian?</summary><p>Yes. Mindstack sends any analysis to your Obsidian vault as a note with YAML frontmatter, tags and wikilinks, and can also download Markdown files.</p></details>
     <details><summary>Can I save webpage summaries to Notion?</summary><p>Yes. Connect a Notion integration token in Settings, pick a database, and each analysis is saved as a page in that database.</p></details>
     <details><summary>Does it send my data to your servers?</summary><p>No. There are no Mindstack servers. Page text goes straight from your browser to the AI provider you choose, and your history and knowledge base are stored locally in your browser.</p></details>

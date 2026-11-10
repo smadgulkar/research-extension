@@ -34,7 +34,7 @@ When you analyze a page, the content is sent directly to your chosen AI provider
 
 - **OpenAI:** Subject to [OpenAI's Privacy Policy](https://openai.com/privacy)
 - **Anthropic:** Subject to [Anthropic's Privacy Policy](https://www.anthropic.com/privacy)
-- **Google Gemini:** Subject to [Google's Privacy Policy](https://policies.google.com/privacy)
+- **Google Gemini:** Subject to [Google's Privacy Policy](https://policies.google.com/privacy) and the [Gemini API terms](https://ai.google.dev/gemini-api/terms). If you use a free (unpaid) Gemini key, Google's terms say it may use what you send to improve its products and that human reviewers may read it, so don't analyze sensitive pages with a free key. Paid keys are not used this way.
 
 ### Notion Integration (optional)
 If you connect to Notion, the extension asks for permission to access api.notion.com, and data is sent directly to Notion's API using your personal integration token. We do not have access to your Notion account.

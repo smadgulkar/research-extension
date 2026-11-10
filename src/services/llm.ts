@@ -1,5 +1,6 @@
 import type { Knowledge } from '../storage/db';
 import type { LLMSettings, SummaryLength } from '@/types/models';
+import { resolveGeminiModel } from './geminiModels';
 
 interface AnalysisResult {
   summary: string;
@@ -117,9 +118,10 @@ export class LLMService {
 
   private async callGemini(prompt: string): Promise<string> {
     try {
-      const model = this.settings.model || 'gemini-2.0-flash';
+      // Older settings may name a model Google has shut down; map it to its replacement.
+      const model = resolveGeminiModel(this.settings.model);
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.settings.apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(this.settings.apiKey)}`,
         {
           method: 'POST',
           headers: {
@@ -137,19 +139,39 @@ export class LLMService {
             ],
             generationConfig: {
               temperature: 0.3,
-              maxOutputTokens: 2048,
+              // Gemini 3 models think before answering, and thinking tokens count
+              // against this limit, so 2048 could cut the JSON answer short.
+              maxOutputTokens: 8192,
             }
           })
         }
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 429) {
+          throw new Error(
+            'Gemini rate limit reached. On the free tier, wait a minute and try again, or try tomorrow if the daily limit is used up.'
+          );
+        }
         throw new Error(`Gemini API error: ${errorData.error?.message || response.statusText}`);
       }
 
       const data = await response.json();
-      return data.candidates[0].content.parts[0].text;
+      const candidate = data.candidates?.[0];
+      // Join the answer parts, skipping any thought summaries.
+      const text = (candidate?.content?.parts || [])
+        .filter((part: any) => !part.thought && typeof part.text === 'string')
+        .map((part: any) => part.text)
+        .join('');
+      if (!text) {
+        const reason = data.promptFeedback?.blockReason || candidate?.finishReason || 'no text returned';
+        throw new Error(`Gemini returned no answer (${reason}).`);
+      }
+      if (candidate?.finishReason === 'MAX_TOKENS') {
+        console.warn('Gemini answer hit the output token limit and may be incomplete.');
+      }
+      return text;
     } catch (error) {
       console.error('Gemini API error:', error);
       throw error;
