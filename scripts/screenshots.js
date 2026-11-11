@@ -69,9 +69,8 @@ const SHOTS = [
 
 const QUESTION = 'What matters most when choosing a vector database?';
 const ANSWER =
-  'Based on your saved reading, how you prepare data matters more than which database you pick. ' +
-  'Chunk size and the distance metric drive retrieval quality, while HNSW-style indexes keep search fast at scale. ' +
-  'Managed services cost more but save operational work.';
+  'How you prepare data matters more than which database you pick: chunk size and the distance metric ' +
+  'drive retrieval quality [1]. HNSW indexes keep search fast at scale [1].';
 
 function articleHtml({ title, body }) {
   return `<!doctype html><html><head><title>${title}</title></head><body><article><h1>${title}</h1><p>${body.repeat(25)}</p></article></body></html>`;
@@ -123,8 +122,7 @@ async function main() {
         const prompt = req.postData() || '';
         const key = Object.keys(ARTICLES).find((k) => prompt.includes(k)) || '/tidal-energy';
         const a = ARTICLES[key].analysis;
-        if (prompt.includes('Find the most relevant items')) return json({ choices: [{ message: { content: '[]' } }] });
-        if (prompt.includes('Please provide a comprehensive answer')) return json({ choices: [{ message: { content: ANSWER } }] });
+        if (prompt.includes('Answer the question using only')) return json({ choices: [{ message: { content: ANSWER } }] });
         const content = prompt.includes('key knowledge points')
           ? JSON.stringify(a.keyPoints.slice(0, 3).map((k) => ({ topic: a.topics[0], content: k, confidence: 0.9 })))
           : JSON.stringify(a);
@@ -155,6 +153,9 @@ async function main() {
 
     // Settings with a fetched model list.
     await page.click('[aria-label="Settings"]');
+    // New installs default to Gemini; the mocks below serve OpenAI.
+    await page.waitForSelector('select:has(option[value="anthropic"])');
+    await page.select('select:has(option[value="anthropic"])', 'openai');
     await page.type('input[type="password"]', 'sk-xxxxxxxxxxxxxxxxxxxxxxxx');
     await page.waitForSelector('option[value="gpt-4o"]');
     await settle();
@@ -205,7 +206,9 @@ async function main() {
     await page.waitForSelector('input[placeholder="Search or ask a question..."]');
     await page.type('input[placeholder="Search or ask a question..."]', QUESTION);
     await page.keyboard.press('Enter');
-    await page.waitForFunction(() => document.body.innerText.includes('Based on your saved reading'), { timeout: 15000 });
+    await page.waitForSelector('[data-testid="answer-sources"] a', { timeout: 15000 });
+    // Scroll so the answer and its source links are in view.
+    await page.evaluate(() => document.querySelector('[data-testid="answer-sources"]').scrollIntoView({ block: 'end' }));
     // Show the start of the question, without a caret.
     await page.evaluate(() => {
       const i = document.querySelector('input[placeholder="Search or ask a question..."]');

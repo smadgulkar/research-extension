@@ -2,6 +2,7 @@ import { db } from '../storage/db';
 import { LLMService } from './llm';
 import type { Knowledge } from '../storage/db';
 import type { Page, LLMSettings } from '../types/models';
+import { rankByQuery } from './retrieval';
 
 export class KnowledgeService {
   private llm: LLMService;
@@ -105,35 +106,98 @@ export class KnowledgeService {
     }
   }
 
-  async queryKnowledge(query: string, knowledgeItems: Knowledge[]): Promise<any> {
-    try {
-      if (!knowledgeItems || knowledgeItems.length === 0) {
-        return {
-          relevantKnowledge: [],
-          synthesizedAnswer: "No knowledge items found in the database. Try analyzing some pages first."
-        };
-      }
-
-      // Find relevant knowledge points
-      const relevantKnowledge = await this.llm.findRelevantKnowledge(query, knowledgeItems);
-
-      if (!relevantKnowledge || relevantKnowledge.length === 0) {
-        return {
-          relevantKnowledge: [],
-          synthesizedAnswer: "No relevant information found for your query."
-        };
-      }
-
-      // Synthesize an answer
-      const synthesizedAnswer = await this.llm.synthesizeAnswer(query, relevantKnowledge);
-
+  /**
+   * Answer a question from saved knowledge. Relevant items are picked locally
+   * (see retrieval.ts), so only those go to the AI, in a single request, and
+   * the answer cites the pages they came from.
+   */
+  async queryKnowledge(query: string, knowledgeItems: Knowledge[]): Promise<KnowledgeAnswer> {
+    if (!knowledgeItems || knowledgeItems.length === 0) {
       return {
-        relevantKnowledge,
-        synthesizedAnswer: synthesizedAnswer || "Unable to generate an answer from the available knowledge."
+        relevantKnowledge: [],
+        sources: [],
+        synthesizedAnswer: 'No knowledge items found. Try analyzing some pages first.'
       };
-    } catch (error) {
-      console.error('Error querying knowledge:', error);
-      throw new Error(`Failed to query knowledge: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+
+    const sourceIds = [...new Set(knowledgeItems.flatMap((k) => k.sourcePages || []))];
+    const pages = await db.pages.bulkGet(sourceIds);
+    const pageById = new Map<number, Page>();
+    pages.forEach((p, i) => p && pageById.set(sourceIds[i], p));
+
+    const ranked = rankByQuery(query, knowledgeItems, (k) => [
+      [k.topic, 2],
+      [k.content, 1],
+      [(k.tags || []).join(' '), 1],
+      [pageById.get(k.sourcePages?.[0] ?? -1)?.title || '', 1],
+    ], MAX_CONTEXT_ITEMS).map((r) => r.item);
+
+    if (ranked.length === 0) {
+      return {
+        relevantKnowledge: [],
+        sources: [],
+        synthesizedAnswer: 'Nothing in your saved reading matches that. Try different words, or analyze more pages on this topic.'
+      };
+    }
+
+    // Number each source page once, in order of relevance.
+    const sources: KnowledgeSource[] = [];
+    const sourceNumber = (pageId?: number): number | null => {
+      if (pageId === undefined) return null;
+      const page = pageById.get(pageId);
+      if (!page) return null;
+      let index = sources.findIndex((s) => s.pageId === pageId);
+      if (index < 0) {
+        sources.push({ pageId, title: page.title || page.url, url: page.url });
+        index = sources.length - 1;
+      }
+      return index + 1;
+    };
+
+    const context = ranked
+      .map((k) => {
+        const n = sourceNumber(k.sourcePages?.[0]);
+        return `${n ? `[${n}] ` : ''}${k.topic}: ${k.content}`;
+      })
+      .join('\n');
+    const sourceList = sources.map((s, i) => `[${i + 1}] ${s.title}`).join('\n');
+
+    const prompt = `Answer the question using only the notes below, which come from pages the user has read.
+
+Notes:
+${context}
+
+Sources:
+${sourceList || '(none)'}
+
+Question: ${query}
+
+Rules:
+- Use only the notes. If they don't answer the question, say so briefly and say what they do cover.
+- Cite sources inline with their numbers, like [1] or [2][3].
+- Plain text, no JSON, no markdown headings. Keep it concise.`;
+
+    const answer = (await this.llm.analyze(prompt)).trim();
+
+    return {
+      relevantKnowledge: ranked,
+      sources,
+      synthesizedAnswer: answer || 'Unable to generate an answer from the available knowledge.'
+    };
   }
+}
+
+/** Notes sent to the AI per question. Keeps requests small as the knowledge base grows. */
+const MAX_CONTEXT_ITEMS = 12;
+
+export interface KnowledgeSource {
+  pageId: number;
+  title: string;
+  url: string;
+}
+
+export interface KnowledgeAnswer {
+  relevantKnowledge: Knowledge[];
+  sources: KnowledgeSource[];
+  synthesizedAnswer: string;
 } 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Search, Book, ArrowRight, ThumbsUp, ThumbsDown, Info, Database, Brain, X, Tag, Clock, Loader, Folder, Plus, FolderOpen, Trash2 } from 'lucide-react';
 import { db } from '@/storage/db';
-import { KnowledgeService } from '@/services/knowledgeService';
+import { KnowledgeService, type KnowledgeSource } from '@/services/knowledgeService';
 import type { Knowledge, Workspace } from '@/types/models';
 import KnowledgeGuide from './KnowledgeGuide';
 import WorkspaceManager from './WorkspaceManager';
@@ -22,6 +22,9 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
     const [isSearching, setIsSearching] = useState(false);
     const [knowledgeItems, setKnowledgeItems] = useState<Knowledge[]>([]);
     const [answer, setAnswer] = useState('');
+    const [sources, setSources] = useState<KnowledgeSource[]>([]);
+    // True after a question, so an empty result reads "no matches", not "empty knowledge base".
+    const [hasSearched, setHasSearched] = useState(false);
     const [topTopics, setTopTopics] = useState<{topic: string, count: number}[]>([]);
     const [showInfo, setShowInfo] = useState(true);
     const [showGuide, setShowGuide] = useState(false);
@@ -83,11 +86,15 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
 
     const searchKnowledge = async () => {
       if (!query.trim()) {
+        setAnswer('');
+        setSources([]);
+        setHasSearched(false);
         await loadKnowledgeBase();
         return;
       }
-      
+
       setIsSearching(true);
+      setSources([]);
       try {
         const knowledgeService = new KnowledgeService(settings);
         
@@ -101,16 +108,20 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
         
         if (knowledgeItems.length === 0) {
           setKnowledgeItems([]);
+          setHasSearched(false);
           setAnswer("No knowledge items found in this workspace. Try analyzing some pages first.");
           return;
         }
-        
+
         const result = await knowledgeService.queryKnowledge(query, knowledgeItems);
         setKnowledgeItems(result.relevantKnowledge);
+        setSources(result.sources);
         setAnswer(result.synthesizedAnswer);
+        setHasSearched(true);
       } catch (error) {
         console.error('Knowledge search error:', error);
-        setAnswer("An error occurred while searching. Please try again.");
+        setHasSearched(true);
+        setAnswer(`Couldn't answer that: ${error instanceof Error ? error.message : 'unknown error'}`);
       } finally {
         setIsSearching(false);
       }
@@ -293,16 +304,36 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
 
           {/* Answer Display */}
           {answer && (
-            <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="bg-blue-50 p-4 rounded-lg" data-testid="knowledge-answer">
               <h3 className="font-medium text-blue-900 mb-2">Answer:</h3>
-              <p className="text-blue-800">{answer}</p>
+              <p className="text-blue-800 whitespace-pre-wrap">{answer}</p>
+              {sources.length > 0 && (
+                <ol className="mt-3 pt-3 border-t border-blue-100 space-y-1 text-sm" data-testid="answer-sources">
+                  {sources.map((source, i) => (
+                    <li key={source.pageId} className="flex gap-1.5 min-w-0">
+                      <span className="text-blue-900 font-medium shrink-0">[{i + 1}]</span>
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-700 hover:underline truncate"
+                        title={source.url}
+                      >
+                        {source.title}
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </div>
           )}
         </div>
 
         {/* Knowledge Items Display */}
         <div className="flex-1 overflow-y-auto">
-          {knowledgeItems.length === 0 ? (
+          {knowledgeItems.length === 0 && hasSearched ? (
+            <p className="text-center text-sm text-gray-500 py-6">No matching notes.</p>
+          ) : knowledgeItems.length === 0 ? (
             // Empty State
             <div className="text-center py-8">
               <Book size={32} className="mx-auto mb-4 text-gray-400" />

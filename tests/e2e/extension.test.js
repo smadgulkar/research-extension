@@ -93,6 +93,9 @@ async function installProviderMocks(page) {
     }
     if (url.startsWith('https://api.openai.com/v1/chat/completions')) {
       record('openai');
+      if ((req.postData() || '').includes('Answer the question using only')) {
+        return json({ choices: [{ message: { content: 'MOCK_ANSWER: turbines sit in tidal streams [1].' } }] });
+      }
       const content = JSON.stringify(isKnowledge ? KNOWLEDGE : ANALYSIS);
       return json({ choices: [{ message: { content } }] });
     }
@@ -351,6 +354,85 @@ describe('Free Gemini key', () => {
     expect(options).not.toContain('gemini-3.8-flash-tts');
     expect(options).not.toContain('gemini-embedding-2');
     expect(await page.$eval(modelSelect, (s) => s.value)).toBe('gemini-3.6-flash');
+  });
+});
+
+describe('Knowledge Q&A', () => {
+  /** Write pages and knowledge straight into IndexedDB, then reload so the popup sees them. */
+  async function seedKnowledge(page, fillerCount) {
+    await page.evaluate(
+      (fillerCount) =>
+        new Promise((resolve, reject) => {
+          const open = indexedDB.open('ResearchDB');
+          open.onerror = () => reject(open.error);
+          open.onsuccess = () => {
+            const tx = open.result.transaction(['pages', 'knowledge'], 'readwrite');
+            const pages = tx.objectStore('pages');
+            const knowledge = tx.objectStore('knowledge');
+            const addPage = (title, url) =>
+              new Promise((res) => {
+                pages.add({ title, url, content: '', summary: '', keyPoints: [], topics: [], keywords: [], sentiment: '', timestamp: new Date() }).onsuccess = (e) => res(e.target.result);
+              });
+            (async () => {
+              const tidal = await addPage('Tidal energy explained', 'https://example.org/tidal');
+              const bread = await addPage('Sourdough basics', 'https://example.org/bread');
+              const note = (topic, content, pageId) =>
+                knowledge.add({ topic, content, sourcePages: [pageId], tags: [], confidence: 0.9, lastUpdated: new Date(), workspaceId: 1 });
+              note('Tidal turbines', 'Tidal turbines generate electricity from predictable tidal currents.', tidal);
+              note('Sourdough starter', 'A sourdough starter is flour and water fermented by wild yeast.', bread);
+              for (let i = 0; i < fillerCount; i++) note(`Filler topic ${i}`, `Unrelated filler note number ${i} about gardening.`, bread);
+            })();
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+          };
+        }),
+      fillerCount
+    );
+    await page.reload({ waitUntil: 'networkidle0' });
+  }
+
+  test('sends only matching notes in one request and cites the source page', async () => {
+    const { page, calls, problems } = await openPopup();
+    await skipOnboarding(page);
+    await configureProvider(page, 'openai', 'gpt-4o');
+    await seedKnowledge(page, 200);
+
+    await clickButtonWithText(page, 'Knowledge');
+    const input = 'input[placeholder="Search or ask a question..."]';
+    await page.waitForSelector(input);
+    await page.type(input, 'How do tidal turbines make electricity?');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('[data-testid="answer-sources"] a', { timeout: 15000 });
+
+    const qaCalls = calls.filter((c) => c.body && c.body.includes('Answer the question using only'));
+    expect(qaCalls).toHaveLength(1);
+    // The relevant note went to the AI; the 201 unrelated ones did not.
+    expect(qaCalls[0].body).toContain('predictable tidal currents');
+    expect(qaCalls[0].body).not.toContain('sourdough starter');
+    expect(qaCalls[0].body).not.toContain('Unrelated filler');
+    // No second AI call to pick relevant items (the old, unscalable approach).
+    expect(calls.some((c) => c.body && c.body.includes('Find the most relevant items'))).toBe(false);
+
+    expect(await bodyText(page)).toContain('MOCK_ANSWER');
+    const links = await page.$$eval('[data-testid="answer-sources"] a', (as) => as.map((a) => [a.textContent, a.href]));
+    expect(links).toEqual([['Tidal energy explained', 'https://example.org/tidal']]);
+    expect(problems.dialogs).toEqual([]);
+  });
+
+  test('a question with no matches says so without calling the AI', async () => {
+    const { page, calls } = await openPopup();
+    await skipOnboarding(page);
+    await configureProvider(page, 'openai', 'gpt-4o');
+    await seedKnowledge(page, 0);
+
+    await clickButtonWithText(page, 'Knowledge');
+    const input = 'input[placeholder="Search or ask a question..."]';
+    await page.waitForSelector(input);
+    await page.type(input, 'quantum chromodynamics');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.body.innerText.includes('Nothing in your saved reading matches'), { timeout: 10000 });
+    expect(calls.some((c) => c.body && c.body.includes('Answer the question using only'))).toBe(false);
+    expect(await bodyText(page)).not.toContain('Your Knowledge Base is Empty');
   });
 });
 
