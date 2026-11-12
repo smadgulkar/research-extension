@@ -5,11 +5,14 @@
   "description": "Turn what you read into a searchable AI knowledge base. Summaries & Q&A via GPT, Claude or Gemini. Export to Obsidian & Notion.",
   "permissions": [
     "activeTab",
+    "contextMenus",
     "scripting",
     "storage"
   ],
   "optional_host_permissions": [
-    "https://api.notion.com/*"
+    "https://api.notion.com/*",
+    "http://*/*",
+    "https://*/*"
   ],
   "icons": {
     "16": "icon16.png",
@@ -24,6 +27,14 @@
       "128": "icon128.png"
     },
     "default_title": "Mindstack"
+  },
+  "commands": {
+    "save-page": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "Save the current page to Mindstack"
+    }
   },
   "background": {
     "service_worker": "background.js",

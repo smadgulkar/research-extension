@@ -26,18 +26,31 @@ export function tokenize(text: string): string[] {
     .map(stem);
 }
 
-function stem(t: string): string {
-  if (t.length <= 4) return t;
-  if (t.endsWith('ies')) return t.slice(0, -3) + 'y';
-  for (const suffix of ['ing', 'ed', 'es', 's']) {
-    if (t.endsWith(suffix) && t.length - suffix.length >= 4) return t.slice(0, -suffix.length);
+/**
+ * Light suffix stripping so word forms meet: turbine/turbines, embedding/embeddings,
+ * database/databases all reduce to the same stem. Plural first, then -ing/-ed, then a final -e.
+ */
+export function stem(word: string): string {
+  let t = word;
+  if (t.length <= 3) return t;
+  if (t.endsWith('ies') && t.length > 4) t = t.slice(0, -3) + 'y';
+  else if (t.endsWith('s') && !t.endsWith('ss') && !t.endsWith('us') && !t.endsWith('is')) t = t.slice(0, -1);
+  const before = t;
+  if (t.endsWith('ing') && t.length >= 6) t = t.slice(0, -3);
+  else if (t.endsWith('ed') && t.length >= 5) t = t.slice(0, -2);
+  // running -> runn -> run (a doubled final consonant, except l, s and z)
+  if (t !== before && t.length >= 4 && t[t.length - 1] === t[t.length - 2] && !'aeiouslz'.includes(t[t.length - 1])) {
+    t = t.slice(0, -1);
   }
+  if (t.endsWith('e') && t.length >= 4) t = t.slice(0, -1);
   return t;
 }
 
 export interface RankedResult<T> {
   item: T;
   score: number;
+  /** How many distinct query terms the item contains. */
+  matched: number;
 }
 
 /**
@@ -79,13 +92,15 @@ export function rankByQuery<T>(
   return docs
     .map(({ item, tf, length }) => {
       let score = 0;
+      let matched = 0;
       for (const term of queryTerms) {
         const f = tf.get(term);
         if (!f) continue;
+        matched++;
         const idf = Math.log(1 + (n - df.get(term)! + 0.5) / (df.get(term)! + 0.5));
         score += (idf * f * (k1 + 1)) / (f + k1 * (1 - b + (b * length) / avgLength));
       }
-      return { item, score };
+      return { item, score, matched };
     })
     .filter((r) => r.score > 0)
     .sort((a, b) => b.score - a.score)

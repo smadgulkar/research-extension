@@ -9,7 +9,7 @@
   },
   "version": {
     "license": "all-rights-reserved",
-    "approval_notes": "Source is uploaded with each version. Build: Node 22, `npm ci && npm run build:firefox`, output in dist-firefox/. popup.js is a webpack bundle of src/; the Function/innerHTML lint warnings come from lodash, the webpack runtime and react-dom, not from extension code. The extension makes network requests only to the AI provider the user configures (OpenAI, Anthropic or Google Gemini, using the user's own API key) and, optionally, to api.notion.com when the user connects Notion. No analytics, no remote code."
+    "approval_notes": "Source is uploaded with each version. Build: Node 22, `npm ci && npm run build:firefox`, output in dist-firefox/. popup.js and background.js are webpack bundles of src/; the Function/innerHTML lint warnings come from lodash, the webpack runtime and react-dom, not from extension code. Page access (http/https) is an optional permission, requested only if the user turns on suggestions; related-page matching then runs locally on the device. The extension makes network requests only to the AI provider the user configures (OpenAI, Anthropic or Google Gemini, using the user's own API key) and, optionally, to api.notion.com when the user connects Notion. No analytics, no remote code."
   },
   "name": {
     "en-US": "Mindstack – AI knowledge base & summarizer"

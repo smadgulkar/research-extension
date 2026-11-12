@@ -45,6 +45,20 @@ const ARTICLES = {
       sentiment: 'positive',
     },
   },
+  '/rag-pipelines': {
+    title: 'Building a RAG Pipeline With Vector Search',
+    body: 'Retrieval-augmented generation pairs a language model with a vector search index over your own documents. ',
+    analysis: {
+      summary: 'A RAG pipeline retrieves relevant chunks with vector search and passes them to the model as context.',
+      keyPoints: [
+        'Vector search retrieves the chunks most similar to the question',
+        'Embedding quality limits retrieval quality',
+        'Re-ranking the top results improves answers',
+      ],
+      topics: ['RAG', 'Vector search', 'Embeddings'],
+      sentiment: 'neutral',
+    },
+  },
   '/tidal-energy': {
     title: 'How Tidal Turbines Turn Ocean Currents Into Power',
     body: 'Tidal turbines sit on the seabed and turn as the tide flows in and out, generating electricity on a predictable schedule. ',
@@ -72,8 +86,21 @@ const ANSWER =
   'How you prepare data matters more than which database you pick: chunk size and the distance metric ' +
   'drive retrieval quality [1]. HNSW indexes keep search fast at scale [1].';
 
+const UNSAVED_ARTICLE = {
+  title: 'Embeddings and Vector Search: A Practical Guide',
+  body: 'Good embeddings put similar ideas close together, which is what makes vector search useful for finding related passages. ',
+};
+
 function articleHtml({ title, body }) {
-  return `<!doctype html><html><head><title>${title}</title></head><body><article><h1>${title}</h1><p>${body.repeat(25)}</p></article></body></html>`;
+  const para = `<p>${body.repeat(6)}</p>`;
+  return `<!doctype html><html><head><title>${title}</title><style>
+    body{margin:0;background:#fafaf9;color:#1c1917;font:19px/1.7 Georgia,'Times New Roman',serif}
+    header{border-bottom:1px solid #e7e5e4;background:#fff;padding:18px 0;font:600 18px system-ui,sans-serif;color:#44403c}
+    header div,article{max-width:720px;margin:0 auto;padding:0 24px}
+    h1{font:700 40px/1.2 system-ui,-apple-system,'Segoe UI',sans-serif;letter-spacing:-.02em;margin:48px 0 8px}
+    .meta{font:15px system-ui,sans-serif;color:#78716c;margin-bottom:32px}
+  </style></head><body><header><div>The Example Blog</div></header><article><h1>${title}</h1>
+  <div class="meta">8 min read</div>${para.repeat(5)}</article></body></html>`;
 }
 
 async function main() {
@@ -83,7 +110,7 @@ async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
   const server = http.createServer((req, res) => {
-    const article = ARTICLES[req.url] || ARTICLES['/tidal-energy'];
+    const article = req.url === '/embeddings-guide' ? UNSAVED_ARTICLE : ARTICLES[req.url] || ARTICLES['/tidal-energy'];
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(articleHtml(article));
   });
@@ -120,7 +147,8 @@ async function main() {
       }
       if (url.startsWith('https://api.openai.com/v1/chat/completions')) {
         const prompt = req.postData() || '';
-        const key = Object.keys(ARTICLES).find((k) => prompt.includes(k)) || '/tidal-energy';
+        // Analysis prompts include the URL; knowledge prompts include the title.
+        const key = Object.keys(ARTICLES).find((k) => prompt.includes(k) || prompt.includes(ARTICLES[k].title)) || '/tidal-energy';
         const a = ARTICLES[key].analysis;
         if (prompt.includes('Answer the question using only')) return json({ choices: [{ message: { content: ANSWER } }] });
         const content = prompt.includes('key knowledge points')
@@ -162,8 +190,8 @@ async function main() {
     captures['6-settings.png'] = await page.screenshot();
     await clickText('Save Settings');
 
-    // Analyze three articles; the last one is the one shown in the results shots.
-    const order = ['/tidal-energy', '/four-day-week', '/vector-databases'];
+    // Analyze four articles; the last one is the one shown in the results shots.
+    const order = ['/tidal-energy', '/rag-pipelines', '/four-day-week', '/vector-databases'];
     for (const [i, route] of order.entries()) {
       await page.evaluate(async (url) => {
         const win = await chrome.windows.getCurrent();
@@ -216,6 +244,26 @@ async function main() {
     });
     await settle();
     captures['1-ask.png'] = await page.screenshot();
+
+    // On-page related reading (opt-in suggestions) on an article that isn't saved yet.
+    await page.evaluate(() =>
+      chrome.storage.local.set({ suggestions: { enabled: true, related: true, offerSave: true, mutedSites: [] } })
+    );
+    const site = await browser.newPage();
+    await site.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 });
+    await site.goto(base + '/embeddings-guide', { waitUntil: 'networkidle0' });
+    const agentHas = (t) =>
+      site.waitForFunction((x) => (document.querySelector('#mindstack-agent')?.shadowRoot?.textContent || '').includes(x), { timeout: 15000 }, t);
+    await agentHas('related page');
+    await site.evaluate(() => {
+      const root = document.querySelector('#mindstack-agent').shadowRoot;
+      [...root.querySelectorAll('button')].find((b) => b.textContent.includes('related page')).click();
+    });
+    await agentHas('Related from your reading');
+    await settle();
+    await site.screenshot({ path: path.join(OUT_DIR, 'related-on-page.png') });
+    console.log('wrote', path.join('docs/screenshots', 'related-on-page.png'));
+    await site.close();
 
     // Compose each capture onto a captioned 1280x800 canvas.
     const canvas = await browser.newPage();

@@ -27,8 +27,9 @@ Mindstack (formerly Research Assistant) captures the articles, docs and papers y
 
 🧩 Personal Knowledge Base
 • Every analysis builds your searchable knowledge base
-• Ask questions across all your research
-• AI-powered answers from your collected insights
+• Ask questions across all your research, with answers that cite your sources
+• Save any page with Alt+Shift+S or right-click, without opening the extension
+• Optional reminders: see what you've already read on a topic, right on the page, matched on your device
 • Organize with customizable workspaces
 
 📤 Export Anywhere (all free)
@@ -144,6 +145,25 @@ Ask questions across everything you've saved
 ```
 
 ---
+
+## Version 2.1 Changelog (draft)
+
+Mindstack now comes to you:
+• Save any page with Alt+Shift+S or right-click > "Save page to Mindstack", with a confirmation on the page
+• Optional suggestions: see related pages you've already read, right on the page, plus a count on the toolbar icon. Matching happens on your device
+• After you've read an article, a one-click offer to save it (optional, and never more than one prompt per page)
+• The popup shows "Related from your reading" and whether you've already saved the page
+• Knowledge answers cite the pages they came from, and stay fast and cheap however much you've saved
+• Fixed: the Summary Length buttons and "Analyze selected text only" now work
+
+## Permission justifications (Chrome dashboard > Privacy practices)
+
+- **contextMenus:** Adds "Save page to Mindstack" to the right-click menu so users can save the page they're reading without opening the extension.
+- **activeTab:** Reads the current page only when the user clicks the toolbar icon, presses the save shortcut or uses the right-click menu.
+- **scripting:** Extracts the readable text of the current page for analysis, and shows the on-page save confirmation and suggestions.
+- **storage:** Saves settings and preferences locally.
+- **Optional host permissions (http://*/*, https://*/*):** Requested only if the user turns on "Suggestions while browsing". Used to compare the page being viewed with the user's saved reading on the device, and to show related pages and a save offer on the page. No page data leaves the device unless the user clicks Save.
+- **Optional host permission (api.notion.com):** Requested only when the user connects Notion, to export analyses to their Notion database.
 
 ## Version 2.0 Changelog
 

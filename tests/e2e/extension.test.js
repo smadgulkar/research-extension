@@ -71,49 +71,33 @@ afterEach(async () => {
   if (browser) await browser.close();
 });
 
-/** Mock every provider endpoint. Returns the list of intercepted provider requests. */
-async function installProviderMocks(page) {
-  const calls = [];
-  await page.setRequestInterception(true);
-  page.on('request', (req) => {
-    const url = req.url();
-    const json = (body) =>
-      req.respond({
-        status: 200,
-        contentType: 'application/json',
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify(body),
-      });
-    const isKnowledge = (req.postData() || '').includes('key knowledge points');
-    const record = (provider) => calls.push({ provider, url, headers: req.headers(), body: req.postData() });
+/** Fake provider responses: returns { provider, body } for a provider API request, or null. */
+function mockResponse(url, postData = '') {
+  const isKnowledge = postData.includes('key knowledge points');
+  const mock = (provider, body) => ({ provider, body });
 
     if (url.startsWith('https://api.openai.com/v1/models')) {
-      record('openai');
-      return json({ data: [{ id: 'gpt-4o', created: 2 }, { id: 'text-embedding-3-small', created: 1 }] });
+            return mock('openai', { data: [{ id: 'gpt-4o', created: 2 }, { id: 'text-embedding-3-small', created: 1 }] });
     }
     if (url.startsWith('https://api.openai.com/v1/chat/completions')) {
-      record('openai');
-      if ((req.postData() || '').includes('Answer the question using only')) {
-        return json({ choices: [{ message: { content: 'MOCK_ANSWER: turbines sit in tidal streams [1].' } }] });
+            if (postData.includes('Answer the question using only')) {
+        return mock('openai', { choices: [{ message: { content: 'MOCK_ANSWER: turbines sit in tidal streams [1].' } }] });
       }
       const content = JSON.stringify(isKnowledge ? KNOWLEDGE : ANALYSIS);
-      return json({ choices: [{ message: { content } }] });
+      return mock('openai', { choices: [{ message: { content } }] });
     }
     if (url.startsWith('https://api.anthropic.com/v1/models')) {
-      record('anthropic');
-      return json({ data: [{ id: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5', created_at: '2026-01-01T00:00:00Z' }] });
+            return mock('anthropic', { data: [{ id: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5', created_at: '2026-01-01T00:00:00Z' }] });
     }
     if (url.startsWith('https://api.anthropic.com/v1/messages')) {
-      record('anthropic');
-      // Claude often fences JSON. The analyzer must cope with that.
+            // Claude often fences JSON. The analyzer must cope with that.
       const text = '```json\n' + JSON.stringify(isKnowledge ? KNOWLEDGE : ANALYSIS, null, 2) + '\n```';
-      return json({ content: [{ type: 'text', text }] });
+      return mock('anthropic', { content: [{ type: 'text', text }] });
     }
     if (url.startsWith('https://generativelanguage.googleapis.com/') && url.includes('/models?')) {
-      record('gemini');
-      // Paid-only and non-text models come first; the free Flash model must still be the default.
+            // Paid-only and non-text models come first; the free Flash model must still be the default.
       const gen = ['generateContent'];
-      return json({
+      return mock('gemini', {
         models: [
           { name: 'models/gemini-4-carbon', displayName: 'Gemini 4 Carbon', supportedGenerationMethods: gen },
           { name: 'models/gemini-3.8-flash-tts', displayName: 'Gemini 3.8 Flash TTS', supportedGenerationMethods: gen },
@@ -123,15 +107,69 @@ async function installProviderMocks(page) {
       });
     }
     if (url.startsWith('https://generativelanguage.googleapis.com/') && url.includes(':generateContent')) {
-      record('gemini');
-      // Prose around the JSON, as Gemini sometimes does.
+            // Prose around the JSON, as Gemini sometimes does.
       const text = 'Here is the analysis:\n' + JSON.stringify(isKnowledge ? KNOWLEDGE : ANALYSIS);
       // A thought-summary part comes first, as Gemini 3 thinking models can return.
-      return json({ candidates: [{ content: { parts: [{ text: 'THOUGHT_SHOULD_BE_SKIPPED', thought: true }, { text }] } }] });
+      return mock('gemini', { candidates: [{ content: { parts: [{ text: 'THOUGHT_SHOULD_BE_SKIPPED', thought: true }, { text }] } }] });
     }
-    return req.continue();
+    return null;
+}
+
+/** Mock every provider endpoint for a page. Returns the list of intercepted provider requests. */
+async function installProviderMocks(page, calls = []) {
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    const m = mockResponse(req.url(), req.postData() || '');
+    if (!m) return req.continue();
+    calls.push({ provider: m.provider, url: req.url(), headers: req.headers(), body: req.postData() });
+    return req.respond({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify(m.body),
+    });
   });
   return calls;
+}
+
+/**
+ * The background service worker makes its own provider requests (saving from the
+ * shortcut, menu or on-page offer). Page interception doesn't see those, so mock
+ * them through the DevTools Fetch domain on the worker.
+ */
+async function installWorkerMocks(calls) {
+  const target = await browser.waitForTarget(
+    (t) => t.type() === 'service_worker' && t.url().startsWith(`chrome-extension://${extensionId}/`),
+    { timeout: 10000 }
+  );
+  const session = await target.createCDPSession();
+  session.on('Fetch.requestPaused', async (e) => {
+    let postData = e.request.postData || '';
+    if (!postData && e.request.postDataEntries) {
+      postData = e.request.postDataEntries.map((x) => Buffer.from(x.bytes || '', 'base64').toString()).join('');
+    }
+    const m = mockResponse(e.request.url, postData);
+    if (!m) return session.send('Fetch.continueRequest', { requestId: e.requestId }).catch(() => {});
+    calls.push({ provider: m.provider, url: e.request.url, headers: e.request.headers, body: postData, fromWorker: true });
+    await session
+      .send('Fetch.fulfillRequest', {
+        requestId: e.requestId,
+        responseCode: 200,
+        responseHeaders: [
+          { name: 'Content-Type', value: 'application/json' },
+          { name: 'Access-Control-Allow-Origin', value: '*' },
+        ],
+        body: Buffer.from(JSON.stringify(m.body)).toString('base64'),
+      })
+      .catch(() => {});
+  });
+  await session.send('Fetch.enable', {
+    patterns: [
+      { urlPattern: 'https://api.openai.com/*' },
+      { urlPattern: 'https://api.anthropic.com/*' },
+      { urlPattern: 'https://generativelanguage.googleapis.com/*' },
+    ],
+  });
 }
 
 /** Open the popup as a tab, tracking dialogs and uncaught errors. */
@@ -147,7 +185,11 @@ async function openPopup({ mocks = true } = {}) {
     page.on('console', (m) => console.log(`[popup ${m.type()}]`, m.text()));
     page.on('requestfailed', (r) => console.log('[popup requestfailed]', r.url(), r.failure()?.errorText));
   }
-  const calls = mocks ? await installProviderMocks(page) : [];
+  const calls = [];
+  if (mocks) {
+    await installProviderMocks(page, calls);
+    await installWorkerMocks(calls);
+  }
   await page.goto(`chrome-extension://${extensionId}/popup.html`, { waitUntil: 'networkidle0' });
   return { page, problems, calls };
 }
@@ -312,6 +354,20 @@ describe.each([
   });
 });
 
+describe('Analyze options', () => {
+  test('the Summary Length choice reaches the AI prompt', async () => {
+    const { page, calls } = await openPopup();
+    await skipOnboarding(page);
+    await configureProvider(page, 'openai', 'gpt-4o');
+    await pointPopupAtFixture(page);
+    await clickButtonWithText(page, 'Short');
+    await clickButtonWithText(page, 'ANALYZE PAGE');
+    await page.waitForFunction(() => document.body.innerText.includes('MOCK_SUMMARY'), { timeout: 15000 });
+    const analyzeCall = calls.find((c) => c.body && c.body.includes('Analyze the following web content'));
+    expect(analyzeCall.body).toContain('very concise summary in 2-3 sentences');
+  });
+});
+
 describe('Free Gemini key', () => {
   test('new installs default to Gemini and show the free-key hint until a key is entered', async () => {
     const { page, problems } = await openPopup();
@@ -357,40 +413,183 @@ describe('Free Gemini key', () => {
   });
 });
 
-describe('Knowledge Q&A', () => {
-  /** Write pages and knowledge straight into IndexedDB, then reload so the popup sees them. */
-  async function seedKnowledge(page, fillerCount) {
-    await page.evaluate(
-      (fillerCount) =>
-        new Promise((resolve, reject) => {
-          const open = indexedDB.open('ResearchDB');
-          open.onerror = () => reject(open.error);
-          open.onsuccess = () => {
-            const tx = open.result.transaction(['pages', 'knowledge'], 'readwrite');
-            const pages = tx.objectStore('pages');
-            const knowledge = tx.objectStore('knowledge');
-            const addPage = (title, url) =>
-              new Promise((res) => {
-                pages.add({ title, url, content: '', summary: '', keyPoints: [], topics: [], keywords: [], sentiment: '', timestamp: new Date() }).onsuccess = (e) => res(e.target.result);
-              });
-            (async () => {
-              const tidal = await addPage('Tidal energy explained', 'https://example.org/tidal');
-              const bread = await addPage('Sourdough basics', 'https://example.org/bread');
-              const note = (topic, content, pageId) =>
-                knowledge.add({ topic, content, sourcePages: [pageId], tags: [], confidence: 0.9, lastUpdated: new Date(), workspaceId: 1 });
-              note('Tidal turbines', 'Tidal turbines generate electricity from predictable tidal currents.', tidal);
-              note('Sourdough starter', 'A sourdough starter is flour and water fermented by wild yeast.', bread);
-              for (let i = 0; i < fillerCount; i++) note(`Filler topic ${i}`, `Unrelated filler note number ${i} about gardening.`, bread);
-            })();
-            tx.oncomplete = () => resolve();
-            tx.onerror = () => reject(tx.error);
-          };
-        }),
-      fillerCount
-    );
-    await page.reload({ waitUntil: 'networkidle0' });
-  }
+/** Write pages and knowledge straight into IndexedDB, then reload so the popup sees them. */
+async function seedKnowledge(page, fillerCount) {
+  await page.evaluate(
+    (fillerCount) =>
+      new Promise((resolve, reject) => {
+        const open = indexedDB.open('ResearchDB');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const tx = open.result.transaction(['pages', 'knowledge'], 'readwrite');
+          const pages = tx.objectStore('pages');
+          const knowledge = tx.objectStore('knowledge');
+          const addPage = (title, url) =>
+            new Promise((res) => {
+              pages.add({ title, url, content: '', summary: '', keyPoints: [], topics: [], keywords: [], sentiment: '', timestamp: new Date() }).onsuccess = (e) => res(e.target.result);
+            });
+          (async () => {
+            const tidal = await addPage('Tidal energy explained', 'https://example.org/tidal');
+            const bread = await addPage('Sourdough basics', 'https://example.org/bread');
+            const note = (topic, content, pageId) =>
+              knowledge.add({ topic, content, sourcePages: [pageId], tags: [], confidence: 0.9, lastUpdated: new Date(), workspaceId: 1 });
+            note('Tidal turbines', 'Tidal turbines generate electricity from predictable tidal currents.', tidal);
+            note('Sourdough starter', 'A sourdough starter is flour and water fermented by wild yeast.', bread);
+            for (let i = 0; i < fillerCount; i++) note(`Filler topic ${i}`, `Unrelated filler note number ${i} about gardening.`, bread);
+          })();
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+      }),
+    fillerCount
+  );
+  await page.reload({ waitUntil: 'networkidle0' });
+}
 
+/** Open the fixture article in a new tab of the popup's window. Returns its tab id and Puppeteer page. */
+async function openFixtureTab(popup) {
+  const tabId = await popup.evaluate(async (url) => {
+    const win = await chrome.windows.getCurrent();
+    const tab = await chrome.tabs.create({ url, active: true, windowId: win.id });
+    return tab.id;
+  }, fixtureUrl);
+  const target = await browser.waitForTarget((t) => t.url() === fixtureUrl, { timeout: 10000 });
+  const fixture = await target.page();
+  await fixture.waitForFunction(() => document.readyState === 'complete');
+  await fixture.bringToFront();
+  return { tabId, fixture };
+}
+
+/** Text of Mindstack's on-page UI (its shadow root is open in test builds). */
+const agentText = (fixture) =>
+  fixture.evaluate(() => document.querySelector('#mindstack-agent')?.shadowRoot?.textContent || '');
+
+async function waitForAgentText(fixture, text, timeout = 15000) {
+  await fixture.waitForFunction(
+    (t) => (document.querySelector('#mindstack-agent')?.shadowRoot?.textContent || '').includes(t),
+    { timeout },
+    text
+  );
+}
+
+async function clickAgentButton(fixture, label) {
+  await fixture.evaluate((l) => {
+    const root = document.querySelector('#mindstack-agent').shadowRoot;
+    [...root.querySelectorAll('button')].find((b) => b.textContent.trim() === l || b.textContent.trim().endsWith(l)).click();
+  }, label);
+}
+
+const savedTitles = (page) =>
+  page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const open = indexedDB.open('ResearchDB');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const req = open.result.transaction('pages').objectStore('pages').getAll();
+          req.onsuccess = () => resolve(req.result.map((p) => p.title));
+          req.onerror = () => reject(req.error);
+        };
+      })
+  );
+
+const enableSuggestionsForTest = (popup) =>
+  popup.evaluate(() =>
+    chrome.storage.local.set({ suggestions: { enabled: true, related: true, offerSave: true, mutedSites: [] } })
+  );
+
+describe('Saving without opening the popup (shortcut / right-click path)', () => {
+  test('saves the page and confirms on the page itself', async () => {
+    const { page } = await openPopup();
+    await skipOnboarding(page);
+    await configureProvider(page, 'openai', 'gpt-4o');
+    const { tabId, fixture } = await openFixtureTab(page);
+
+    // The shortcut and the menu both call the same background capture; trigger it directly.
+    await page.evaluate((id) => chrome.runtime.sendMessage({ type: 'MS_SAVE_PAGE', tabId: id }), tabId);
+    await waitForAgentText(fixture, 'Saved to Mindstack');
+    expect(await agentText(fixture)).toContain('2 key points');
+    expect(await savedTitles(page)).toContain(FIXTURE_TITLE);
+    expect(await page.evaluate((id) => chrome.action.getBadgeText({ tabId: id }), tabId)).toBe('✓');
+
+    // Saving again doesn't duplicate it.
+    await page.evaluate((id) => chrome.runtime.sendMessage({ type: 'MS_SAVE_PAGE', tabId: id }), tabId);
+    await waitForAgentText(fixture, 'Already in your Mindstack');
+    expect((await savedTitles(page)).filter((t) => t === FIXTURE_TITLE)).toHaveLength(1);
+  });
+
+  test('without an API key it explains what to do instead of failing silently', async () => {
+    const { page } = await openPopup();
+    await skipOnboarding(page);
+    const { tabId, fixture } = await openFixtureTab(page);
+    await page.evaluate((id) => chrome.runtime.sendMessage({ type: 'MS_SAVE_PAGE', tabId: id }), tabId);
+    await waitForAgentText(fixture, 'Add an API key first');
+    expect(await savedTitles(page)).toEqual([]);
+  });
+});
+
+describe('Suggestions while browsing (opt-in)', () => {
+  test('off by default: nothing appears on pages', async () => {
+    const { page } = await openPopup();
+    await skipOnboarding(page);
+    await configureProvider(page, 'openai', 'gpt-4o');
+    await seedKnowledge(page, 0);
+    const { fixture } = await openFixtureTab(page);
+    await new Promise((r) => setTimeout(r, 3000));
+    expect(await fixture.$('#mindstack-agent')).toBeNull();
+  });
+
+  test('shows related reading on the page and a count on the toolbar icon', async () => {
+    const { page } = await openPopup();
+    await skipOnboarding(page);
+    await seedKnowledge(page, 20);
+    await enableSuggestionsForTest(page);
+    const { tabId, fixture } = await openFixtureTab(page);
+
+    await waitForAgentText(fixture, 'related page');
+    expect(await page.evaluate((id) => chrome.action.getBadgeText({ tabId: id }), tabId)).toBe('1');
+    await clickAgentButton(fixture, "You’ve read 1 related page");
+    await waitForAgentText(fixture, 'Related from your reading');
+    const text = await agentText(fixture);
+    expect(text).toContain('Tidal energy explained');
+    expect(text).not.toContain('Sourdough basics');
+
+    // "Not on this site" mutes it.
+    await clickAgentButton(fixture, 'Not on this site');
+    await page.waitForFunction(
+      async () => ((await chrome.storage.local.get('suggestions')).suggestions?.mutedSites || []).includes('127.0.0.1')
+    );
+  });
+
+  test('offers to save an article after it has been read, and saves on click', async () => {
+    const { page } = await openPopup();
+    await skipOnboarding(page);
+    await configureProvider(page, 'openai', 'gpt-4o');
+    await enableSuggestionsForTest(page);
+    const { fixture } = await openFixtureTab(page);
+
+    await waitForAgentText(fixture, 'Worth remembering?');
+    await clickAgentButton(fixture, 'Save');
+    await waitForAgentText(fixture, 'Saved to Mindstack');
+    expect(await savedTitles(page)).toContain(FIXTURE_TITLE);
+  });
+});
+
+describe('Popup shows related reading for the current page', () => {
+  test('lists saved pages on the same topic', async () => {
+    const { page } = await openPopup();
+    await skipOnboarding(page);
+    await seedKnowledge(page, 0);
+    await pointPopupAtFixture(page);
+    await page.waitForSelector('[data-testid="related-reading"]', { timeout: 10000 });
+    const text = await page.$eval('[data-testid="related-reading"]', (el) => el.innerText);
+    expect(text).toContain('Related from your reading');
+    expect(text).toContain('Tidal energy explained');
+    expect(text).not.toContain('Sourdough basics');
+  });
+});
+
+describe('Knowledge Q&A', () => {
   test('sends only matching notes in one request and cites the source page', async () => {
     const { page, calls, problems } = await openPopup();
     await skipOnboarding(page);

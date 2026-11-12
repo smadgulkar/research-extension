@@ -21,7 +21,7 @@ Mindstack is a browser extension that helps you analyze web content using AI. We
 ### What We Do NOT Collect
 
 - We do NOT collect any personal information
-- We do NOT track your browsing history
+- We do NOT track or record your browsing history (see "Suggestions while browsing" below for the optional feature that reads the page you're on)
 - We do NOT send any data to our servers
 - We do NOT use analytics or tracking services
 - We do NOT share any data with third parties, other than sending content to the services you choose (your AI provider, and Notion if you connect it)
@@ -39,6 +39,16 @@ When you analyze a page, the content is sent directly to your chosen AI provider
 ### Notion Integration (optional)
 If you connect to Notion, the extension asks for permission to access api.notion.com, and data is sent directly to Notion's API using your personal integration token. We do not have access to your Notion account.
 
+### Saving with the keyboard shortcut or right-click menu
+Pressing the shortcut (Alt+Shift+S by default) or choosing "Save page to Mindstack" gives the extension one-time access to that tab, the same as clicking Analyze in the popup. The page is sent to your AI provider and saved locally, and a small confirmation is shown on the page.
+
+### Suggestions while browsing (optional, off by default)
+If you turn on suggestions, your browser asks you to let Mindstack read the pages you visit. With that permission:
+- When a page finishes loading, Mindstack reads its title, description and headings, and compares them with your saved reading **on your device**. Nothing is sent to an AI provider or anywhere else, and the pages you visit are not recorded.
+- If you have read related pages, the toolbar icon shows a count, and a small panel on the page lists them. It is drawn in an isolated area the website's own scripts cannot read.
+- After you have spent some time reading an article, Mindstack may offer to save it. Content is sent to your AI provider only if you click Save.
+- You can hide suggestions on any site, or turn them off in Settings, which also gives the permission back.
+
 ### No Intermediary Servers
 Mindstack does not operate any backend servers. All extension functionality runs locally in your browser.
 
@@ -49,7 +59,7 @@ All data is stored locally using:
 - **Chrome Storage API** for settings and preferences
 
 Your data never leaves your device unless you explicitly:
-1. Make an API call to analyze content
+1. Analyze or save a page (popup, keyboard shortcut, right-click menu, or the on-page Save button)
 2. Export to Notion
 3. Share via the Web Share API
 

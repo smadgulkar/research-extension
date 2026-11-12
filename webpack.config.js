@@ -88,6 +88,8 @@ module.exports = {
     },
   },
   plugins: [
+    // Test builds shorten timers and use an open shadow root so tests can inspect the on-page UI.
+    new (require('webpack').DefinePlugin)({ __E2E__: JSON.stringify(isE2E) }),
     new CopyPlugin({
       patterns: [
         {

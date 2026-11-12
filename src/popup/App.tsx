@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '@/storage/db';
-import { LLMService } from '@/services/llm';
 import { Settings, History, Loader, X, BookOpen, Cog, Filter,
          LucideIcon, Tag, Clock, Brain, Book, Folder, Crown, Key } from 'lucide-react';
 import type { Settings as SettingsType } from '@/storage/db';
@@ -9,19 +8,21 @@ import SummaryDisplay from './components/SummaryDisplay';
 import SearchBar from './components/SearchBar';
 import NoteEditor from './components/NoteEditor';
 import KnowledgeExplorer from './components/KnowledgeExplorer';
-import { ContentAnalyzer } from '@/services/contentAnalyzer';
 import { ModelService } from '@/services/modelService';
-import { KnowledgeService } from '@/services/knowledgeService';
 import { migrateToWorkspaces } from '../migration';
 import PageAnalyzer from './components/PageAnalyzer';
 import WorkspaceManager from './components/WorkspaceManager';
 import { KnowledgeExplorerRef } from './components/KnowledgeExplorer';
 import FeedbackButton from '../components/FeedbackButton';
 import PremiumSettings from './components/PremiumSettings';
-import RatingPrompt, { recordSuccessfulAnalysis, shouldShowRatingPrompt } from './components/RatingPrompt';
+import RatingPrompt, { shouldShowRatingPrompt } from './components/RatingPrompt';
 import NotionSettings from './components/NotionSettings';
 import Onboarding from './components/Onboarding';
 import FreeKeyHint from './components/FreeKeyHint';
+import RelatedReading from './components/RelatedReading';
+import SuggestionsCard from './components/SuggestionsCard';
+import { extractPage, type ExtractedPage } from '@/inpage/extract';
+import { analyzeAndSave, MissingApiKeyError } from '@/services/capture';
 import { GEMINI_DEFAULT_MODEL } from '@/services/geminiModels';
 import { premiumService, PAID_TIER_ENABLED } from '../services/premiumService';
 
@@ -35,14 +36,7 @@ interface TabButtonProps {
   onTabChange: (id: string) => void;
 }
 
-interface CurrentPage {
-  content: string;
-  metadata: {
-    title: string;
-    url: string;
-    description: string;
-  };
-}
+type CurrentPage = ExtractedPage;
 
 interface AnalysisResult {
   summary: string;
@@ -151,26 +145,9 @@ const App: React.FC = () => {
       if (!tab?.id) return;
       if (!tab.url || tab.url.startsWith('chrome://')) return;
 
-      // Execute content extraction directly without separate content script
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: () => {
-          const article = document.querySelector('article');
-          const main = document.querySelector('main');
-          const content = article?.textContent || main?.textContent || document.body.textContent || '';
-          
-          const meta = document.querySelector('meta[name="description"]');
-          const description = meta?.getAttribute('content') || '';
-
-          return {
-            content,
-            metadata: {
-              title: document.title,
-              url: window.location.href,
-              description
-            }
-          };
-        }
+        func: extractPage
       });
 
       if (results?.[0]?.result) {
@@ -228,82 +205,35 @@ const App: React.FC = () => {
   // Page analysis function
   const analyzePage = async () => {
     if (!currentPage || isLoading) return;
-    
-    // Check if API key is set
+
     if (!settings.apiKey) {
       alert('Please set your API key in the settings before analyzing pages.');
       setShowSettings(true);
       return;
     }
-    
-    // Check if provider is set
-    if (!settings.provider) {
-      setSettings({...settings, provider: 'gemini'});
+
+    const selection = currentPage.selection?.trim() || '';
+    if (selectedTextOnly && !selection) {
+      alert('Select some text on the page first, or untick "Analyze selected text only".');
+      return;
     }
-    
+
     setIsLoading(true);
-    
     try {
-      console.log('Starting page analysis...');
-      
-      // Check if we have content to analyze
-      if (!currentPage.content) {
-        console.error('No content to analyze');
-        return;
-      }
-      
-      const llmService = new LLMService(settings);
-      const analyzer = new ContentAnalyzer(llmService);
-      
-      // Add logging to debug
-      console.log('Analyzing content with URL:', currentPage.metadata.url);
-      
-      // Make sure we're passing the correct parameters
-      const result = await analyzer.analyzeContent(
-        currentPage.content,
-        currentPage.metadata.url
+      const result = await analyzeAndSave(
+        selectedTextOnly ? { ...currentPage, content: selection } : currentPage,
+        settings,
+        selectedWorkspaceId,
+        summaryLength
       );
-      
-      console.log('Analysis result:', result);
-      
-      if (!result) {
-        console.error('No result returned from analyzer');
-        return;
-      }
-      
-      setAnalysisResult(result);
+      setAnalysisResult(result.analysis);
       setShowSummary(true);
-      
-      // Create a page object
-      const page: Page = {
-        url: currentPage.metadata.url,
-        title: currentPage.metadata.title,
-        content: currentPage.content.substring(0, 1000),
-        summary: result.summary || '',
-        keyPoints: result.keyPoints || [],
-        topics: result.topics || [],
-        sentiment: result.sentiment || '',
-        keywords: result.topics || [],
-        timestamp: new Date()
-      };
-      
-      console.log('Saving page to database:', page);
-      
-      // Save the page
-      const pageId = await db.pages.add(page);
-      
-      // Process knowledge with the selected workspace
-      const knowledgeService = new KnowledgeService(settings);
-      await knowledgeService.processPage({...page, id: pageId as number}, selectedWorkspaceId);
-      
       await loadSavedPages();
-      handleAnalysisComplete(page);
-      if (await recordSuccessfulAnalysis()) setShowRatingPrompt(true);
-      
-      console.log('Analysis completed successfully');
+      handleAnalysisComplete(result.page);
+      if (result.showRatingPrompt) setShowRatingPrompt(true);
     } catch (error) {
       console.error('Analysis error:', error);
-      // Show error to user
+      if (error instanceof MissingApiKeyError) setShowSettings(true);
       alert(`Error analyzing page: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
@@ -481,6 +411,8 @@ const App: React.FC = () => {
           <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4 flex-grow overflow-auto">
             {activeTab === 'analyze' && (
               <div className="space-y-4">
+                <SuggestionsCard />
+                {currentPage && <RelatedReading page={currentPage} refreshKey={savedPages.length} />}
                 {/* Page info card */}
                 {currentPage && (
                   <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
@@ -769,6 +701,8 @@ const App: React.FC = () => {
                   >
                     Save Settings
                   </button>
+
+                  <SuggestionsCard variant="settings" />
                 </div>
               ) : PAID_TIER_ENABLED && settingsTab === 'premium' ? (
                 <PremiumSettings onClose={() => {

@@ -13,7 +13,9 @@ Mindstack captures the articles, docs and papers you read, distills each one int
 ## Features
 
 - **A knowledge base that builds itself:** every page you analyze becomes searchable knowledge, organized into workspaces
-- **Ask what you've read:** Q&A across everything you've saved, not the open web
+- **Ask what you've read:** Q&A across everything you've saved, not the open web, with answers that cite the pages they came from
+- **Save without opening anything:** press Alt+Shift+S or right-click > Save page to Mindstack on any page
+- **It reminds you:** opt-in suggestions show what you've already read on a topic, right on the page, and offer to save articles once you've read them. Matching runs on your device
 - **One-click distillation:** summary, key points, topics and sentiment for the page you're reading
 - **Your choice of AI:** OpenAI, Anthropic Claude or Google Gemini; the model list is fetched live from your provider
 - **Free to start:** Gemini's free tier works with Mindstack ([get a key](https://aistudio.google.com/app/apikey)); on the free tier Google may use your inputs to improve its products

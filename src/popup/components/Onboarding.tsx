@@ -18,8 +18,8 @@ const STEPS = [
   {
     id: 'analyze',
     icon: Brain,
-    title: 'Analyze Any Page',
-    description: 'Get instant summaries, key points, and topic extraction from any webpage. Choose between short, medium, or long summaries based on your needs.',
+    title: 'Save Any Page in One Keystroke',
+    description: 'Press Alt+Shift+S, or right-click and choose "Save page to Mindstack". You get a summary and key points without opening anything.',
     color: 'purple',
   },
   {

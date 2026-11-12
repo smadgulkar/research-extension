@@ -3,9 +3,8 @@ import { Star, X } from 'lucide-react';
 
 // Shown once, after the user's Nth successful analysis. Never nags:
 // either action (rate or dismiss) hides it for good.
-export const RATING_THRESHOLD = 5;
-export const ANALYSIS_COUNT_KEY = 'successful_analysis_count';
-export const RATING_PROMPT_KEY = 'rating_prompt_done';
+import { RATING_PROMPT_KEY } from '@/services/usage';
+export { RATING_THRESHOLD, ANALYSIS_COUNT_KEY, RATING_PROMPT_KEY, recordSuccessfulAnalysis, shouldShowRatingPrompt } from '@/services/usage';
 
 // Store review page for whichever store this copy was installed from.
 // A store-installed extension's runtime ID is its store ID (Chrome, Edge),
@@ -16,19 +15,6 @@ export function reviewUrl(): string {
   if (ua.includes('Firefox/')) return `https://addons.mozilla.org/firefox/addon/${id}/reviews/`;
   if (ua.includes('Edg/')) return `https://microsoftedge.microsoft.com/addons/detail/${id}`;
   return `https://chromewebstore.google.com/detail/${id}/reviews`;
-}
-
-// Call after each successful analysis. Returns true if the prompt should now show.
-export async function recordSuccessfulAnalysis(): Promise<boolean> {
-  const stored = await chrome.storage.local.get([ANALYSIS_COUNT_KEY, RATING_PROMPT_KEY]);
-  const count = (Number(stored[ANALYSIS_COUNT_KEY]) || 0) + 1;
-  await chrome.storage.local.set({ [ANALYSIS_COUNT_KEY]: count });
-  return !stored[RATING_PROMPT_KEY] && count >= RATING_THRESHOLD;
-}
-
-export async function shouldShowRatingPrompt(): Promise<boolean> {
-  const stored = await chrome.storage.local.get([ANALYSIS_COUNT_KEY, RATING_PROMPT_KEY]);
-  return !stored[RATING_PROMPT_KEY] && (Number(stored[ANALYSIS_COUNT_KEY]) || 0) >= RATING_THRESHOLD;
 }
 
 interface RatingPromptProps {

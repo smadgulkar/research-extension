@@ -73,14 +73,9 @@ export class ContentAnalyzer {
           readingTime: this.calculateReadingTime(content)
         };
       } catch (error) {
-        console.error('Error parsing analysis result:', error);
-        return {
-          summary: 'Error analyzing content.',
-          keyPoints: [],
-          topics: [],
-          sentiment: 'neutral',
-          readingTime: this.calculateReadingTime(content)
-        };
+        // Don't save a page with a placeholder summary; let the caller show the error.
+        console.error('Error parsing analysis result:', error, responseText);
+        throw new Error("The AI's reply couldn't be read. Please try again.");
       }
     } catch (error) {
       console.error('Content analysis error:', error);
