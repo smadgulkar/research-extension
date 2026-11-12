@@ -112,20 +112,26 @@ Made with ❤️ for researchers everywhere.
 
 ## Screenshot Descriptions
 
-### Screenshot 1: Main Analysis View
-Show the extension popup with a page being analyzed, displaying the summary and key points.
+Upload in this order from `docs/screenshots/` (Chrome allows 5; the first is the main listing image).
+Captions are printed on the images, so there is nothing to type per screenshot.
+Regenerate with `npm run screenshots`.
 
-### Screenshot 2: Knowledge Base
-Show the Knowledge tab with the Q&A interface and knowledge items.
+### Screenshot 1: `2-summary.png` - "Open it. It's already summarized."
+The popup on an article: summarized and saved as soon as it opens, no buttons to press.
 
-### Screenshot 3: Export Options
-Show the export dropdown with different format options (Markdown, JSON, Obsidian, Notion).
+### Screenshot 2: `1-ask.png` - "Ask everything you've read"
+The Ask tab answering a question from saved reading, with numbered sources.
 
-### Screenshot 4: Settings
-Show the settings modal with API provider and model selection.
+### Screenshot 3: `related-on-page.png` - Related reading on the page
+The on-page panel (opt-in suggestions) showing pages the user already saved that relate to the one open, plus an offer to save it.
 
-### Screenshot 5: Workspaces
-Show the workspace manager with multiple workspaces organized by project.
+### Screenshot 4: `3-key-points.png` - "Key points, and what you read before"
+Key points of a saved article and related pages from the user's own library.
+
+### Screenshot 5: `4-history.png` - "A knowledge base that builds itself"
+The Library tab listing saved pages.
+
+Not uploaded to Chrome (5-image limit): `5-export.png` ("It comes to you": shortcut and right-click save) and `6-settings.png` ("Your AI, your key, your data"). Firefox allows more, so add them there.
 
 ---
 
