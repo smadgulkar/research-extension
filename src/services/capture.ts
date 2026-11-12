@@ -17,6 +17,12 @@ export interface CaptureResult {
   showRatingPrompt: boolean;
 }
 
+/** What the background saver reports back to the popup. */
+export type CaptureOutcome =
+  | { status: 'saved'; pageId: number }
+  | { status: 'exists'; pageId: number }
+  | { status: 'error'; error: string; missingKey?: boolean };
+
 export class MissingApiKeyError extends Error {
   constructor() {
     super('Add an API key in Mindstack settings first.');

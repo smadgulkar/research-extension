@@ -149,6 +149,11 @@ Ask questions across everything you've saved
 ## Version 2.1 Changelog (draft)
 
 Mindstack now comes to you:
+• Open Mindstack on an article and it is already summarized and saved, with no button to press (undo with one click, or turn it off in Settings). Pages you saved before open instantly
+• A simpler popup: This page, Library and Ask
+• If Google's free Gemini model is busy, Mindstack switches to another free Gemini model automatically
+• Ask finds answers even when your question uses different words from your notes
+• Each save uses one AI request instead of two, so free-tier limits go further
 • Save any page with Alt+Shift+S or right-click > "Save page to Mindstack", with a confirmation on the page
 • Optional suggestions: see related pages you've already read, right on the page, plus a count on the toolbar icon. Matching happens on your device
 • After you've read an article, a one-click offer to save it (optional, and never more than one prompt per page)

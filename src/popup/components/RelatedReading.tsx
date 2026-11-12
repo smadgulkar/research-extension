@@ -7,10 +7,12 @@ interface RelatedReadingProps {
   page: ExtractedPage;
   /** Changes when pages are saved, so the list refreshes. */
   refreshKey?: unknown;
+  /** Don't repeat "Saved on..." when the page's summary is already showing. */
+  hideSaved?: boolean;
 }
 
 /** "Already saved" and "Related from your reading" for the page the popup was opened on. */
-const RelatedReading: React.FC<RelatedReadingProps> = ({ page, refreshKey }) => {
+const RelatedReading: React.FC<RelatedReadingProps> = ({ page, refreshKey, hideSaved }) => {
   const [result, setResult] = useState<RelatedResult | null>(null);
 
   useEffect(() => {
@@ -28,11 +30,12 @@ const RelatedReading: React.FC<RelatedReadingProps> = ({ page, refreshKey }) => 
     };
   }, [page.metadata.url, refreshKey]);
 
-  if (!result || (!result.saved && result.related.length === 0)) return null;
+  const showSaved = !!result?.saved && !hideSaved;
+  if (!result || (!showSaved && result.related.length === 0)) return null;
 
   return (
     <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-sm" data-testid="related-reading">
-      {result.saved && (
+      {showSaved && result.saved && (
         <p className="flex items-center gap-1.5 text-gray-700">
           <CheckCircle2 size={15} className="text-green-600 shrink-0" />
           Saved to your Mindstack on {new Date(result.saved.timestamp).toLocaleDateString()}
@@ -40,7 +43,7 @@ const RelatedReading: React.FC<RelatedReadingProps> = ({ page, refreshKey }) => 
       )}
       {result.related.length > 0 && (
         <>
-          <p className={`flex items-center gap-1.5 font-medium text-gray-900 ${result.saved ? 'mt-2' : ''}`}>
+          <p className={`flex items-center gap-1.5 font-medium text-gray-900 ${showSaved ? 'mt-2' : ''}`}>
             <BookMarked size={15} className="text-blue-600 shrink-0" />
             Related from your reading
           </p>

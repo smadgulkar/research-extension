@@ -74,10 +74,10 @@ const ARTICLES = {
 // Chrome Web Store accepts at most 5 screenshots: upload 1-5 there; 6 is extra for AMO.
 const SHOTS = [
   { file: '1-ask.png', caption: 'Ask everything you\'ve read', sub: 'Answers come from your own saved reading, not the open web.' },
-  { file: '2-summary.png', caption: 'Distill any page in one click', sub: 'Summaries from GPT, Claude or Gemini, using your own API key.' },
-  { file: '3-key-points.png', caption: 'Key points, topics and sentiment', sub: 'Get the substance of long articles, docs and papers in seconds.' },
+  { file: '2-summary.png', caption: 'Open it. It\'s already summarized.', sub: 'Click Mindstack on any article and it is summarized and saved. No buttons to press.' },
+  { file: '3-key-points.png', caption: 'Key points, and what you read before', sub: 'See the substance of long articles, plus related pages from your own reading.' },
   { file: '4-history.png', caption: 'A knowledge base that builds itself', sub: 'Every page you analyze is saved, searchable and organized into workspaces.' },
-  { file: '5-export.png', caption: 'Export to Obsidian, Notion and more', sub: 'Markdown, JSON, HTML, Obsidian with frontmatter, or straight into a Notion database.' },
+  { file: '5-export.png', caption: 'It comes to you', sub: 'Save any page with Alt+Shift+S, and get reminders of related reading as you browse.' },
   { file: '6-settings.png', caption: 'Your AI, your key, your data', sub: 'No account and no servers. Requests go straight from your browser to the provider you choose.' },
 ];
 
@@ -137,27 +137,43 @@ async function main() {
 
     const page = await browser.newPage();
     await page.setViewport({ width: 400, height: 600, deviceScaleFactor: 2 });
+    // Fake provider replies, used for the popup and the background worker (which saves pages).
+    const mockBody = (url, prompt) => {
+      if (url.startsWith('https://api.openai.com/v1/models')) {
+        return { data: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'o3-mini'].map((id, i) => ({ id, created: 10 - i })) };
+      }
+      if (url.startsWith('https://api.openai.com/v1/chat/completions')) {
+        if (prompt.includes('Answer the question using only')) return { choices: [{ message: { content: ANSWER } }] };
+        const key = Object.keys(ARTICLES).find((k) => prompt.includes(k) || prompt.includes(ARTICLES[k].title)) || '/tidal-energy';
+        return { choices: [{ message: { content: JSON.stringify(ARTICLES[key].analysis) } }] };
+      }
+      return null;
+    };
     await page.setRequestInterception(true);
     page.on('dialog', (d) => d.dismiss());
     page.on('request', (req) => {
-      const url = req.url();
-      const json = (body) => req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
-      if (url.startsWith('https://api.openai.com/v1/models')) {
-        return json({ data: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'o3-mini'].map((id, i) => ({ id, created: 10 - i })) });
-      }
-      if (url.startsWith('https://api.openai.com/v1/chat/completions')) {
-        const prompt = req.postData() || '';
-        // Analysis prompts include the URL; knowledge prompts include the title.
-        const key = Object.keys(ARTICLES).find((k) => prompt.includes(k) || prompt.includes(ARTICLES[k].title)) || '/tidal-energy';
-        const a = ARTICLES[key].analysis;
-        if (prompt.includes('Answer the question using only')) return json({ choices: [{ message: { content: ANSWER } }] });
-        const content = prompt.includes('key knowledge points')
-          ? JSON.stringify(a.keyPoints.slice(0, 3).map((k) => ({ topic: a.topics[0], content: k, confidence: 0.9 })))
-          : JSON.stringify(a);
-        return json({ choices: [{ message: { content } }] });
-      }
-      return req.continue();
+      const body = mockBody(req.url(), req.postData() || '');
+      if (!body) return req.continue();
+      return req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     });
+    const cdp = await worker.createCDPSession();
+    cdp.on('Fetch.requestPaused', async (e) => {
+      let prompt = e.request.postData || '';
+      if (!prompt && e.request.postDataEntries) {
+        prompt = e.request.postDataEntries.map((x) => Buffer.from(x.bytes || '', 'base64').toString()).join('');
+      }
+      const body = mockBody(e.request.url, prompt);
+      if (!body) return cdp.send('Fetch.continueRequest', { requestId: e.requestId }).catch(() => {});
+      await cdp
+        .send('Fetch.fulfillRequest', {
+          requestId: e.requestId,
+          responseCode: 200,
+          responseHeaders: [{ name: 'Content-Type', value: 'application/json' }, { name: 'Access-Control-Allow-Origin', value: '*' }],
+          body: Buffer.from(JSON.stringify(body)).toString('base64'),
+        })
+        .catch(() => {});
+    });
+    await cdp.send('Fetch.enable', { patterns: [{ urlPattern: 'https://api.openai.com/*' }] });
 
     const clickText = async (text) => {
       await page.waitForFunction(
@@ -167,11 +183,6 @@ async function main() {
       );
       await page.evaluate((t) => [...document.querySelectorAll('button')].find((b) => b.innerText.trim().includes(t)).click(), text);
     };
-    const closeResults = () =>
-      page.evaluate(() => {
-        const h2 = [...document.querySelectorAll('h2')].find((h) => h.innerText.includes('Analysis Results'));
-        h2.parentElement.querySelector('button').click();
-      });
     const settle = () => new Promise((r) => setTimeout(r, 400));
     const captures = {};
 
@@ -209,37 +220,39 @@ async function main() {
       await page.reload({ waitUntil: 'networkidle0' });
       await page.waitForFunction((t) => document.body.innerText.includes(t), { timeout: 10000 }, ARTICLES[route].title);
       await page.bringToFront();
-      await clickText('ANALYZE PAGE');
-      await page.waitForFunction(() => document.body.innerText.includes('Analysis Results'), { timeout: 15000 });
-      if (i < order.length - 1) await closeResults();
+      await page.waitForSelector('[data-testid="page-result"]', { timeout: 15000 });
     }
 
     await settle();
     captures['2-summary.png'] = await page.screenshot();
-    await clickText('Key Points');
+    await page.evaluate(() => document.querySelector('main').scrollTo(0, document.querySelector('main').scrollHeight));
     await settle();
     captures['3-key-points.png'] = await page.screenshot();
-    await clickText('Markdown');
+
+    await page.click('[aria-label="Settings"]');
+    await page.waitForSelector('[data-testid="summary-prefs"]');
+    await page.evaluate(() => document.querySelector('[data-testid="summary-prefs"]').scrollIntoView({ block: 'start' }));
     await settle();
     captures['5-export.png'] = await page.screenshot();
-    await page.keyboard.press('Escape');
-    await closeResults();
-    await clickText('History');
+    await clickText('Save Settings');
+
+    await clickText('Library');
     await page.waitForFunction((t) => document.body.innerText.includes(t), { timeout: 5000 }, "Beginner's Guide");
     await settle();
     captures['4-history.png'] = await page.screenshot();
 
     // Knowledge Q&A across everything saved.
-    await clickText('Knowledge');
-    await page.waitForSelector('input[placeholder="Search or ask a question..."]');
-    await page.type('input[placeholder="Search or ask a question..."]', QUESTION);
+    await clickText('Ask');
+    const askInput = 'input[placeholder="Ask about anything you\'ve saved..."]';
+    await page.waitForSelector(askInput);
+    await page.type(askInput, QUESTION);
     await page.keyboard.press('Enter');
     await page.waitForSelector('[data-testid="answer-sources"] a', { timeout: 15000 });
     // Scroll so the answer and its source links are in view.
     await page.evaluate(() => document.querySelector('[data-testid="answer-sources"]').scrollIntoView({ block: 'end' }));
     // Show the start of the question, without a caret.
     await page.evaluate(() => {
-      const i = document.querySelector('input[placeholder="Search or ask a question..."]');
+      const i = document.querySelector('input[placeholder^="Ask about"]');
       i.setSelectionRange(0, 0); i.scrollLeft = 0; i.blur();
     });
     await settle();

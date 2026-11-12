@@ -39,8 +39,11 @@ When you analyze a page, the content is sent directly to your chosen AI provider
 ### Notion Integration (optional)
 If you connect to Notion, the extension asks for permission to access api.notion.com, and data is sent directly to Notion's API using your personal integration token. We do not have access to your Notion account.
 
+### Opening Mindstack on an article
+When you click the Mindstack icon on a page that looks like an article, Mindstack summarizes and saves it straight away: the page text is sent to your AI provider and the result is saved locally. A page you saved before is shown from your device without contacting the AI. You can remove a saved page with one click, or turn this off in Settings ("Summarize articles when I open Mindstack"), in which case nothing is sent until you click "Summarize & save".
+
 ### Saving with the keyboard shortcut or right-click menu
-Pressing the shortcut (Alt+Shift+S by default) or choosing "Save page to Mindstack" gives the extension one-time access to that tab, the same as clicking Analyze in the popup. The page is sent to your AI provider and saved locally, and a small confirmation is shown on the page.
+Pressing the shortcut (Alt+Shift+S by default) or choosing "Save page to Mindstack" gives the extension one-time access to that tab, the same as opening the popup. The page is sent to your AI provider and saved locally, and a small confirmation is shown on the page.
 
 ### Suggestions while browsing (optional, off by default)
 If you turn on suggestions, your browser asks you to let Mindstack read the pages you visit. With that permission:
@@ -58,10 +61,11 @@ All data is stored locally using:
 - **IndexedDB** (via Dexie.js) for pages, knowledge base, and workspaces
 - **Chrome Storage API** for settings and preferences
 
-Your data never leaves your device unless you explicitly:
-1. Analyze or save a page (popup, keyboard shortcut, right-click menu, or the on-page Save button)
-2. Export to Notion
-3. Share via the Web Share API
+Your data leaves your device only when you:
+1. Save a page: by opening the popup on an article (if "Summarize articles when I open Mindstack" is on, as it is by default), or with the popup's button, the keyboard shortcut, the right-click menu or the on-page Save button
+2. Ask a question about your saved reading (the most relevant saved notes are sent with it)
+3. Export to Notion
+4. Share via the Web Share API
 
 ## Data Security
 

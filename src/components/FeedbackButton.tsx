@@ -9,10 +9,9 @@ const FeedbackButton: React.FC = () => {
       href={formUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 
-                 text-white font-medium rounded-lg transition-colors"
+      className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-blue-600 transition-colors"
     >
-      <MessageCircle size={18} className="mr-2" />
+      <MessageCircle size={13} />
       Send Feedback
     </a>
   );

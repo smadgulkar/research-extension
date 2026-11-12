@@ -14,6 +14,7 @@ Mindstack captures the articles, docs and papers you read, distills each one int
 
 - **A knowledge base that builds itself:** every page you analyze becomes searchable knowledge, organized into workspaces
 - **Ask what you've read:** Q&A across everything you've saved, not the open web, with answers that cite the pages they came from
+- **Open it and it's done:** click Mindstack on an article and it is summarized and saved, no buttons. Pages you saved before open instantly
 - **Save without opening anything:** press Alt+Shift+S or right-click > Save page to Mindstack on any page
 - **It reminds you:** opt-in suggestions show what you've already read on a topic, right on the page, and offer to save articles once you've read them. Matching runs on your device
 - **One-click distillation:** summary, key points, topics and sentiment for the page you're reading

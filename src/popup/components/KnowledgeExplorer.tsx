@@ -5,9 +5,12 @@ import { KnowledgeService, type KnowledgeSource } from '@/services/knowledgeServ
 import type { Knowledge, Workspace } from '@/types/models';
 import KnowledgeGuide from './KnowledgeGuide';
 import WorkspaceManager from './WorkspaceManager';
+import { getPrefs, updatePrefs } from '@/services/prefs';
 
 interface KnowledgeExplorerProps {
   settings: any;
+  /** Switch to the "This page" tab (from the empty state). */
+  onGoToPage?: () => void;
 }
 
 // Define the ref type
@@ -17,7 +20,7 @@ export interface KnowledgeExplorerRef {
 }
 
 const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProps>(
-  ({ settings }, ref) => {
+  ({ settings, onGoToPage }, ref) => {
     const [query, setQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const [knowledgeItems, setKnowledgeItems] = useState<Knowledge[]>([]);
@@ -106,14 +109,14 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
           knowledgeItems = await db.knowledge.where('workspaceId').equals(selectedWorkspace).toArray();
         }
         
-        if (knowledgeItems.length === 0) {
+        if (knowledgeItems.length === 0 && (selectedWorkspace !== null || (await db.pages.count()) === 0)) {
           setKnowledgeItems([]);
           setHasSearched(false);
           setAnswer("No knowledge items found in this workspace. Try analyzing some pages first.");
           return;
         }
 
-        const result = await knowledgeService.queryKnowledge(query, knowledgeItems);
+        const result = await knowledgeService.queryKnowledge(query, knowledgeItems, { allPages: selectedWorkspace === null });
         setKnowledgeItems(result.relevantKnowledge);
         setSources(result.sources);
         setAnswer(result.synthesizedAnswer);
@@ -196,8 +199,10 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
           workspaceId: defaultWorkspace.id
         });
         
-        // Delete workspace
+        // Delete workspace; new pages stop going into it.
         await db.workspaces.delete(id);
+        const prefs = await getPrefs();
+        if (prefs.workspaceId === id) await updatePrefs({ workspaceId: null });
         
         // If current workspace was deleted, switch to default
         if (selectedWorkspace === id) {
@@ -240,78 +245,59 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
 
     return (
       <div className="flex flex-col h-full">
-        {/* Workspace Selector */}
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between mb-2">
+        <div className="space-y-3 mb-4">
+          {workspaces.length > 1 && (
             <select
+              aria-label="Workspace"
               value={selectedWorkspace || ''}
               onChange={(e) => setSelectedWorkspace(e.target.value ? Number(e.target.value) : null)}
-              className="flex-1 p-2 border rounded-lg mr-2 text-sm"
+              className="w-full p-1.5 border border-gray-200 rounded-lg text-sm text-gray-700"
             >
-              <option value="">All Workspaces</option>
+              <option value="">All workspaces</option>
               {workspaces.map(workspace => (
                 <option key={workspace.id} value={workspace.id}>
                   {workspace.name}
                 </option>
               ))}
             </select>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Ask about anything you've saved..."
+              className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') searchKnowledge();
+              }}
+            />
+            <button
+              onClick={searchKnowledge}
+              disabled={isSearching}
+              className="px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-400 flex items-center"
+            >
+              {isSearching ? <Loader size={16} className="animate-spin" /> : 'Ask'}
+            </button>
             <button
               onClick={() => setShowWorkspaceModal(true)}
-              className="p-2 text-gray-600 hover:text-blue-600 rounded-lg hover:bg-gray-100"
-              title="Manage Workspaces"
+              className="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-gray-100"
+              title="Workspaces"
+              aria-label="Workspaces"
             >
-              <Plus size={20} />
+              <Folder size={16} />
             </button>
-          </div>
-        </div>
-
-        {/* Search and Q&A Interface */}
-        <div className="mb-4 space-y-4">
-          <div className="flex flex-col space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Search Knowledge Base or Ask a Question
-            </label>
-            <div className="flex space-x-2">
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search or ask a question..."
-                className="flex-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    searchKnowledge();
-                  }
-                }}
-              />
-              <button
-                onClick={searchKnowledge}
-                disabled={isSearching}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 
-                         disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
-              >
-                {isSearching ? (
-                  <>
-                    <Loader size={16} className="animate-spin mr-2" />
-                    Searching...
-                  </>
-                ) : (
-                  'Search'
-                )}
-              </button>
-            </div>
           </div>
 
           {/* Answer Display */}
           {answer && (
-            <div className="bg-blue-50 p-4 rounded-lg" data-testid="knowledge-answer">
-              <h3 className="font-medium text-blue-900 mb-2">Answer:</h3>
-              <p className="text-blue-800 whitespace-pre-wrap">{answer}</p>
+            <div className="bg-blue-50 p-3 rounded-lg text-sm" data-testid="knowledge-answer">
+              <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">{answer}</p>
               {sources.length > 0 && (
                 <ol className="mt-3 pt-3 border-t border-blue-100 space-y-1 text-sm" data-testid="answer-sources">
                   {sources.map((source, i) => (
                     <li key={source.pageId} className="flex gap-1.5 min-w-0">
-                      <span className="text-blue-900 font-medium shrink-0">[{i + 1}]</span>
+                      <span className="text-blue-900 font-medium shrink-0">[{source.number ?? i + 1}]</span>
                       <a
                         href={source.url}
                         target="_blank"
@@ -329,57 +315,40 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
           )}
         </div>
 
-        {/* Knowledge Items Display */}
+        {/* Notes */}
         <div className="flex-1 overflow-y-auto">
-          {knowledgeItems.length === 0 && hasSearched ? (
-            <p className="text-center text-sm text-gray-500 py-6">No matching notes.</p>
-          ) : knowledgeItems.length === 0 ? (
-            // Empty State
-            <div className="text-center py-8">
-              <Book size={32} className="mx-auto mb-4 text-gray-400" />
-              <h3 className="text-lg font-medium text-gray-800 mb-2">
-                Your Knowledge Base is Empty
-              </h3>
-              <p className="text-gray-600 mb-4">
-                Start analyzing web pages to build your knowledge base.
-              </p>
-              <button 
-                onClick={() => window.parent.postMessage({ type: 'SWITCH_TAB', tab: 'analyze' }, '*')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Analyze Your First Page
-              </button>
+          {knowledgeItems.length === 0 && hasSearched ? null : knowledgeItems.length === 0 ? (
+            <div className="text-center py-8 space-y-2">
+              <Book size={26} className="mx-auto text-gray-300" />
+              <p className="text-sm font-medium text-gray-800">Nothing saved yet</p>
+              <p className="text-sm text-gray-500">Save a few pages, then ask questions across everything you've read.</p>
+              {onGoToPage && (
+                <button onClick={onGoToPage} className="text-sm text-blue-600 hover:underline">
+                  Save this page
+                </button>
+              )}
             </div>
           ) : (
-            <div className="space-y-4">
-              {knowledgeItems.map((item) => (
-                <div key={item.id} className="bg-white p-4 rounded-lg border relative group">
-                  {/* Delete button */}
-                  <button
-                    onClick={() => deleteKnowledgeItem(item.id!)}
-                    className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-600 
-                             opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Delete knowledge item"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-
-                  <h3 className="font-medium text-gray-800 mb-2">{item.topic}</h3>
-                  <p className="text-gray-600 mb-2">{item.content}</p>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span className="flex items-center">
-                      <Tag size={14} className="mr-1" />
-                      Confidence: {(item.confidence * 100).toFixed(0)}%
-                    </span>
-                    {item.workspaceId && (
-                      <span className="text-gray-400">
-                        {workspaces.find(w => w.id === item.workspaceId)?.name || 'Unknown Workspace'}
-                      </span>
-                    )}
+            <>
+              <h3 className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-1">
+                {hasSearched ? 'Notes used' : 'Recent notes'}
+              </h3>
+              <div className="divide-y divide-gray-100">
+                {knowledgeItems.map((item) => (
+                  <div key={item.id} className="py-2.5 relative group pr-6">
+                    <button
+                      onClick={() => deleteKnowledgeItem(item.id!)}
+                      className="absolute top-2.5 right-0 p-0.5 text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Delete note"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                    <p className="text-xs text-gray-400 line-clamp-1">{item.topic}</p>
+                    <p className="text-sm text-gray-700">{item.content}</p>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
 

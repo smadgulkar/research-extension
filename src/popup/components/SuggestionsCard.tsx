@@ -67,7 +67,7 @@ const SuggestionsCard: React.FC<SuggestionsCardProps> = ({ variant = 'prompt' })
   if (variant === 'prompt') {
     if (on || dismissed) return null;
     return (
-      <div className="relative rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-sm" data-testid="suggestions-card">
+      <div className="relative rounded-xl bg-indigo-50 p-3 text-sm" data-testid="suggestions-card">
         <button onClick={dismiss} className="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600" aria-label="Not now">
           <X size={14} />
         </button>
@@ -76,8 +76,7 @@ const SuggestionsCard: React.FC<SuggestionsCardProps> = ({ variant = 'prompt' })
           Let Mindstack remind you
         </p>
         <p className="mt-1 text-gray-600">
-          While you browse, see what you've already read on a topic, and get a one-click offer to save articles you've read.
-          Matching happens on your device; nothing is sent anywhere until you choose to save.
+          See what you've already read on a topic while you browse. Matching stays on your device.
         </p>
         <div className="mt-3 flex items-center gap-3">
           <button onClick={turnOn} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700">
@@ -85,11 +84,6 @@ const SuggestionsCard: React.FC<SuggestionsCardProps> = ({ variant = 'prompt' })
           </button>
           <button onClick={dismiss} className="text-gray-500 hover:text-gray-700">Not now</button>
         </div>
-        {shortcut && (
-          <p className="mt-3 flex items-center gap-1.5 text-xs text-gray-500">
-            <Keyboard size={13} /> Tip: press <kbd className="px-1 rounded border bg-white">{shortcut}</kbd> on any page to save it.
-          </p>
-        )}
       </div>
     );
   }

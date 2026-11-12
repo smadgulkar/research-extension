@@ -1,9 +1,10 @@
 import { db } from './storage/db';
 import { extractPage, type ExtractedPage } from './inpage/extract';
 import { mindstackAgent, type AgentConfig, type AgentRelated } from './inpage/agent';
-import { analyzeAndSave, MissingApiKeyError } from './services/capture';
+import { analyzeAndSave, MissingApiKeyError, type CaptureOutcome } from './services/capture';
 import { findRelated, normalizeUrl } from './services/related';
 import { getSuggestionSettings, updateSuggestionSettings, isMuted, SUGGESTION_ORIGINS } from './services/suggestions';
+import { getPrefs } from './services/prefs';
 
 declare const __E2E__: boolean;
 const E2E = typeof __E2E__ !== 'undefined' && __E2E__;
@@ -37,7 +38,7 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
   if (id !== undefined) capture(id);
 });
 
-chrome.runtime.onMessage.addListener((message, sender) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || typeof message.type !== 'string') return;
   // Extension pages (the popup, even when opened as a tab) say which tab they mean.
   // From the on-page agent, the sender's tab is the page.
@@ -46,7 +47,9 @@ chrome.runtime.onMessage.addListener((message, sender) => {
     ? typeof message.tabId === 'number' ? message.tabId : undefined
     : sender.tab?.id;
   if (message.type === 'MS_SAVE_PAGE' && tabId !== undefined) {
-    capture(tabId);
+    // The popup waits for the result; the save carries on even if it closes.
+    capture(tabId, { selectionOnly: !!message.selectionOnly }).then(sendResponse);
+    return true;
   } else if (message.type === 'MS_MUTE_SITE' && typeof message.host === 'string' && message.host) {
     getSuggestionSettings().then((s) => {
       if (!s.mutedSites.includes(message.host)) updateSuggestionSettings({ mutedSites: [...s.mutedSites, message.host] });
@@ -57,43 +60,60 @@ chrome.runtime.onMessage.addListener((message, sender) => {
 
 // ---------- Saving ----------
 
-const inFlight = new Set<number>();
+// One save per tab at a time; a second request (say the shortcut while the popup
+// is saving) gets the same result instead of saving twice.
+const inFlight = new Map<number, Promise<CaptureOutcome>>();
 
-async function capture(tabId: number): Promise<void> {
-  if (inFlight.has(tabId)) return;
-  inFlight.add(tabId);
+function capture(tabId: number, options: { selectionOnly?: boolean } = {}): Promise<CaptureOutcome> {
+  const running = inFlight.get(tabId);
+  if (running) return running;
+  const job = doCapture(tabId, options).finally(() => inFlight.delete(tabId));
+  inFlight.set(tabId, job);
+  return job;
+}
+
+async function doCapture(tabId: number, { selectionOnly = false }: { selectionOnly?: boolean }): Promise<CaptureOutcome> {
   try {
     try {
       await injectAgent(tabId, { related: [], offerSave: false }, true);
     } catch {
       // Browser pages (chrome://, the web stores) can't be scripted.
       setBadge(tabId, '!', "Mindstack can't save this kind of page");
-      return;
+      return { status: 'error', error: "Mindstack can't read this kind of page." };
     }
     toast(tabId, 'progress', 'Saving to Mindstack…');
 
     const page = await extract(tabId);
     const target = normalizeUrl(page.metadata.url);
     const existing = (await db.pages.toArray()).find((p) => normalizeUrl(p.url) === target);
-    if (existing) {
+    if (existing && !selectionOnly) {
       toast(tabId, 'success', 'Already in your Mindstack');
       setBadge(tabId, '✓', 'Saved in your Mindstack');
-      return;
+      return { status: 'exists', pageId: existing.id! };
     }
 
-    const settings = await db.settings.get('llm');
-    const { analysis } = await analyzeAndSave(page, settings as any);
+    const selection = page.selection?.trim() || '';
+    if (selectionOnly && !selection) throw new Error('Select some text on the page first.');
+    const [settings, prefs] = await Promise.all([db.settings.get('llm'), getPrefs()]);
+    const { page: saved, analysis } = await analyzeAndSave(
+      selectionOnly ? { ...page, content: selection } : page,
+      settings as any,
+      prefs.workspaceId,
+      prefs.summaryLength
+    );
     const n = analysis.keyPoints?.length || 0;
     toast(tabId, 'success', `Saved to Mindstack${n ? ` · ${n} key point${n === 1 ? '' : 's'}` : ''}`);
     setBadge(tabId, '✓', 'Saved in your Mindstack');
+    return { status: 'saved', pageId: saved.id! };
   } catch (error) {
-    const text =
-      error instanceof MissingApiKeyError
-        ? 'Add an API key first: click the Mindstack icon, then Settings. Gemini has a free tier.'
-        : `Couldn't save: ${error instanceof Error ? error.message : 'unknown error'}`;
-    toast(tabId, 'error', text);
-  } finally {
-    inFlight.delete(tabId);
+    const missingKey = error instanceof MissingApiKeyError;
+    const message = error instanceof Error ? error.message : 'unknown error';
+    toast(
+      tabId,
+      'error',
+      missingKey ? 'Add an API key first: click the Mindstack icon, then Settings. Gemini has a free tier.' : `Couldn't save: ${message}`
+    );
+    return { status: 'error', error: message, missingKey };
   }
 }
 

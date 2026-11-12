@@ -29,6 +29,8 @@ const KNOWLEDGE = [{ topic: 'tidal energy', content: 'Tides are predictable.', c
 
 let server;
 let fixtureUrl;
+// Models whose generateContent answers 503 "high demand" (set per test).
+let busyGeminiModels = [];
 let browser;
 let extensionId;
 
@@ -51,6 +53,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  busyGeminiModels = [];
   // Fresh browser + temporary profile per test, so storage never leaks between tests.
   browser = await puppeteer.launch({
     headless: !process.env.HEADFUL,
@@ -74,7 +77,7 @@ afterEach(async () => {
 /** Fake provider responses: returns { provider, body } for a provider API request, or null. */
 function mockResponse(url, postData = '') {
   const isKnowledge = postData.includes('key knowledge points');
-  const mock = (provider, body) => ({ provider, body });
+  const mock = (provider, body, status = 200) => ({ provider, body, status });
 
     if (url.startsWith('https://api.openai.com/v1/models')) {
             return mock('openai', { data: [{ id: 'gpt-4o', created: 2 }, { id: 'text-embedding-3-small', created: 1 }] });
@@ -107,6 +110,9 @@ function mockResponse(url, postData = '') {
       });
     }
     if (url.startsWith('https://generativelanguage.googleapis.com/') && url.includes(':generateContent')) {
+      if (busyGeminiModels.some((m) => url.includes(`/models/${m}:`))) {
+        return mock('gemini', { error: { code: 503, message: 'This model is currently experiencing high demand.', status: 'UNAVAILABLE' } }, 503);
+      }
             // Prose around the JSON, as Gemini sometimes does.
       const text = 'Here is the analysis:\n' + JSON.stringify(isKnowledge ? KNOWLEDGE : ANALYSIS);
       // A thought-summary part comes first, as Gemini 3 thinking models can return.
@@ -123,7 +129,7 @@ async function installProviderMocks(page, calls = []) {
     if (!m) return req.continue();
     calls.push({ provider: m.provider, url: req.url(), headers: req.headers(), body: req.postData() });
     return req.respond({
-      status: 200,
+      status: m.status,
       contentType: 'application/json',
       headers: { 'Access-Control-Allow-Origin': '*' },
       body: JSON.stringify(m.body),
@@ -154,7 +160,7 @@ async function installWorkerMocks(calls) {
     await session
       .send('Fetch.fulfillRequest', {
         requestId: e.requestId,
-        responseCode: 200,
+        responseCode: m.status,
         responseHeaders: [
           { name: 'Content-Type', value: 'application/json' },
           { name: 'Access-Control-Allow-Origin', value: '*' },
@@ -298,7 +304,6 @@ describe('Anthropic requests', () => {
     await skipOnboarding(page);
     await configureProvider(page, 'anthropic', 'claude-sonnet-5-5');
     await pointPopupAtFixture(page);
-    await clickButtonWithText(page, 'ANALYZE PAGE');
     await page.waitForFunction(() => document.body.innerText.includes('MOCK_SUMMARY'), { timeout: 15000 });
 
     const anthropic = calls.filter((c) => c.provider === 'anthropic');
@@ -320,13 +325,13 @@ describe.each([
     const { page, calls, problems } = await openPopup();
     await skipOnboarding(page);
     await configureProvider(page, provider, modelId);
+    // Opening the popup on an article summarizes and saves it, with no button to press.
     await pointPopupAtFixture(page);
-    await clickButtonWithText(page, 'ANALYZE PAGE');
 
     await page.waitForFunction(() => document.body.innerText.includes('MOCK_SUMMARY'), { timeout: 15000 });
     expect(await bodyText(page)).not.toContain('Error analyzing content');
-    await clickButtonWithText(page, 'Key Points');
-    await page.waitForFunction(() => document.body.innerText.includes('Tides are predictable'), { timeout: 5000 });
+    expect(await page.$eval('[data-testid="key-points"]', (el) => el.innerText)).toContain('Tides are predictable');
+    expect(await bodyText(page)).toContain('Saved to your Mindstack');
     expect(problems.dialogs).toEqual([]);
 
     // The request used the model picked from the fetched list and contained the page text.
@@ -351,20 +356,93 @@ describe.each([
         })
     );
     expect(saved).toContain(FIXTURE_TITLE);
+    // One AI request per save: knowledge notes come from the key points.
+    expect(calls.filter((c) => c.provider === provider && /generateContent|messages|chat\/completions/.test(c.url))).toHaveLength(1);
+
+    // Opening it again shows the saved summary straight away, without asking the AI again.
+    await pointPopupAtFixture(page);
+    await page.waitForSelector('[data-testid="page-result"]', { timeout: 10000 });
+    expect(await bodyText(page)).toContain('MOCK_SUMMARY');
+    expect(calls.filter((c) => c.body && c.body.includes('Analyze the following web content'))).toHaveLength(1);
   });
 });
 
-describe('Analyze options', () => {
-  test('the Summary Length choice reaches the AI prompt', async () => {
+describe('This page', () => {
+  test('Remove deletes the page and its notes, and it is not saved again', async () => {
     const { page, calls } = await openPopup();
     await skipOnboarding(page);
     await configureProvider(page, 'openai', 'gpt-4o');
     await pointPopupAtFixture(page);
-    await clickButtonWithText(page, 'Short');
-    await clickButtonWithText(page, 'ANALYZE PAGE');
+    await page.waitForSelector('[data-testid="page-result"]', { timeout: 15000 });
+    await clickButtonWithText(page, 'Remove');
+    await page.waitForFunction(() => document.body.innerText.includes('Removed from your Mindstack'));
+    expect(await savedTitles(page)).toEqual([]);
+    const notes = await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          indexedDB.open('ResearchDB').onsuccess = (e) => {
+            const req = e.target.result.transaction('knowledge').objectStore('knowledge').count();
+            req.onsuccess = () => resolve(req.result);
+          };
+        })
+    );
+    expect(notes).toBe(0);
+    expect(calls.filter((c) => c.body && c.body.includes('Analyze the following web content'))).toHaveLength(1);
+  });
+
+  test('with auto-save off it waits for a click, and Summary length from Settings reaches the prompt', async () => {
+    const { page, calls } = await openPopup();
+    await skipOnboarding(page);
+    await configureProvider(page, 'openai', 'gpt-4o');
+    await page.click('[aria-label="Settings"]');
+    await page.waitForSelector('[data-testid="summary-prefs"]');
+    await page.click('[data-testid="summary-prefs"] input[type="checkbox"]');
+    await page.select('select[aria-label="Summary length"]', 'short');
+    await page.waitForFunction(async () => {
+      const { prefs } = await chrome.storage.local.get('prefs');
+      return prefs && prefs.autoSave === false && prefs.summaryLength === 'short';
+    });
+
+    await pointPopupAtFixture(page);
+    await clickButtonWithText(page, 'Summarize & save');
     await page.waitForFunction(() => document.body.innerText.includes('MOCK_SUMMARY'), { timeout: 15000 });
-    const analyzeCall = calls.find((c) => c.body && c.body.includes('Analyze the following web content'));
-    expect(analyzeCall.body).toContain('very concise summary in 2-3 sentences');
+    const analyzeCalls = calls.filter((c) => c.body && c.body.includes('Analyze the following web content'));
+    expect(analyzeCalls).toHaveLength(1);
+    expect(analyzeCalls[0].body).toContain('very concise summary in 2-3 sentences');
+  });
+
+  test('without a key it offers to connect an AI instead of failing', async () => {
+    const { page, calls } = await openPopup();
+    await skipOnboarding(page);
+    await pointPopupAtFixture(page);
+    await page.waitForSelector('[data-testid="connect-ai"]', { timeout: 10000 });
+    expect(calls.some((c) => c.body && c.body.includes('Analyze the following web content'))).toBe(false);
+  });
+});
+
+describe('Gemini busy', () => {
+  test('when the chosen model has high demand it falls back to another free model', async () => {
+    busyGeminiModels = ['gemini-3.6-flash'];
+    const { page, calls } = await openPopup();
+    await skipOnboarding(page);
+    await configureProvider(page, 'gemini', 'gemini-3.6-flash');
+    await pointPopupAtFixture(page);
+    await page.waitForFunction(() => document.body.innerText.includes('MOCK_SUMMARY'), { timeout: 15000 });
+    const gen = calls.filter((c) => c.url.includes(':generateContent'));
+    expect(gen[0].url).toContain('/models/gemini-3.6-flash:');
+    expect(gen[gen.length - 1].url).toContain('/models/gemini-3.8-flash:');
+    expect(await bodyText(page)).not.toContain('high demand');
+  });
+
+  test('if every free model is busy it says so plainly', async () => {
+    busyGeminiModels = ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+    const { page } = await openPopup();
+    await skipOnboarding(page);
+    await configureProvider(page, 'gemini', 'gemini-3.6-flash');
+    await pointPopupAtFixture(page);
+    await page.waitForSelector('[data-testid="save-error"]', { timeout: 15000 });
+    expect(await page.$eval('[data-testid="save-error"]', (el) => el.innerText)).toContain('busy right now');
+    expect(await savedTitles(page)).toEqual([]);
   });
 });
 
@@ -596,8 +674,8 @@ describe('Knowledge Q&A', () => {
     await configureProvider(page, 'openai', 'gpt-4o');
     await seedKnowledge(page, 200);
 
-    await clickButtonWithText(page, 'Knowledge');
-    const input = 'input[placeholder="Search or ask a question..."]';
+    await clickButtonWithText(page, 'Ask');
+    const input = 'input[placeholder="Ask about anything you\'ve saved..."]';
     await page.waitForSelector(input);
     await page.type(input, 'How do tidal turbines make electricity?');
     await page.keyboard.press('Enter');
@@ -618,27 +696,58 @@ describe('Knowledge Q&A', () => {
     expect(problems.dialogs).toEqual([]);
   });
 
-  test('a question with no matches says so without calling the AI', async () => {
+  test('a question that shares no words with the notes still gets answered from recent reading', async () => {
     const { page, calls } = await openPopup();
     await skipOnboarding(page);
     await configureProvider(page, 'openai', 'gpt-4o');
     await seedKnowledge(page, 0);
 
-    await clickButtonWithText(page, 'Knowledge');
-    const input = 'input[placeholder="Search or ask a question..."]';
+    await clickButtonWithText(page, 'Ask');
+    const input = 'input[placeholder="Ask about anything you\'ve saved..."]';
     await page.waitForSelector(input);
     await page.type(input, 'quantum chromodynamics');
     await page.keyboard.press('Enter');
-    await page.waitForFunction(() => document.body.innerText.includes('Nothing in your saved reading matches'), { timeout: 10000 });
-    expect(calls.some((c) => c.body && c.body.includes('Answer the question using only'))).toBe(false);
-    expect(await bodyText(page)).not.toContain('Your Knowledge Base is Empty');
+    await page.waitForFunction(() => document.body.innerText.includes('MOCK_ANSWER'), { timeout: 10000 });
+    const qa = calls.filter((c) => c.body && c.body.includes('Answer the question using only'));
+    expect(qa).toHaveLength(1);
+    expect(qa[0].body).toContain('most recent pages');
+    expect(qa[0].body).toContain('Tidal energy explained');
+    expect(await bodyText(page)).not.toContain('Nothing saved yet');
+  });
+  test('finds a saved page that has no notes (saved by an older version whose note step failed)', async () => {
+    const { page, calls } = await openPopup();
+    await skipOnboarding(page);
+    await configureProvider(page, 'openai', 'gpt-4o');
+    await seedKnowledge(page, 0);
+    await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          indexedDB.open('ResearchDB').onsuccess = (e) => {
+            const tx = e.target.result.transaction('pages', 'readwrite');
+            tx.objectStore('pages').add({
+              title: 'Rooftop solar panels', url: 'https://example.org/solar', content: '',
+              summary: 'Solar panel output drops in winter but rooftop arrays still pay back within a decade.',
+              keyPoints: [], topics: ['solar'], keywords: [], sentiment: '', timestamp: new Date(),
+            });
+            tx.oncomplete = resolve;
+          };
+        })
+    );
+    await clickButtonWithText(page, 'Ask');
+    const input = 'input[placeholder^="Ask about anything"]';
+    await page.waitForSelector(input);
+    await page.type(input, 'Do solar panels pay back?');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.body.innerText.includes('MOCK_ANSWER'), { timeout: 10000 });
+    const qa = calls.filter((c) => c.body && c.body.includes('Answer the question using only'));
+    expect(qa[0].body).toContain('rooftop arrays still pay back');
+    expect(qa[0].body).not.toContain('most recent pages');
   });
 });
 
 describe('Rating prompt', () => {
   async function analyzeOnce(page) {
     await pointPopupAtFixture(page);
-    await clickButtonWithText(page, 'ANALYZE PAGE');
     await page.waitForFunction(() => document.body.innerText.includes('MOCK_SUMMARY'), { timeout: 15000 });
   }
 

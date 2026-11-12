@@ -3,201 +3,148 @@ import { LLMService } from './llm';
 import type { Knowledge } from '../storage/db';
 import type { Page, LLMSettings } from '../types/models';
 import { rankByQuery } from './retrieval';
+import { stripSiteName } from './related';
 
 export class KnowledgeService {
   private llm: LLMService;
-  private settings: LLMSettings;
 
   constructor(settings: LLMSettings) {
     this.llm = new LLMService(settings);
-    this.settings = settings;
-  }
-
-  async processPage(page: Page, workspaceId: number | null = null): Promise<void> {
-    try {
-      // Extract knowledge from the page
-      const prompt = `
-        Based on the following content, extract 3-5 key knowledge points:
-        Title: ${page.title}
-        Content: ${page.content?.substring(0, 5000) || ''}... // Limit content length
-        Summary: ${page.summary || ''}
-        
-        For each knowledge point:
-        1. Identify a specific topic
-        2. Write a concise, factual statement (1-2 sentences)
-        3. Assign a confidence score (0.0-1.0)
-        
-        Format as JSON array:
-        [
-          {
-            "topic": "specific topic",
-            "content": "concise knowledge statement",
-            "confidence": 0.95
-          },
-          ...
-        ]
-        
-        IMPORTANT: Make sure to provide a valid JSON array with all closing brackets.
-      `;
-      
-      // Extract knowledge points
-      let knowledge = await this.llm.extractKnowledge(prompt);
-      
-      // Validate the knowledge structure
-      if (!Array.isArray(knowledge)) {
-        console.error('Invalid knowledge format, expected array but got:', typeof knowledge);
-        console.log('Knowledge content:', knowledge);
-        knowledge = [];
-      }
-      
-      // If knowledge extraction failed, try a simpler approach
-      if (knowledge.length === 0) {
-        console.log('Knowledge extraction failed, creating a default knowledge item');
-        
-        // Create a single knowledge item based on the page title and summary
-        knowledge = [{
-          topic: page.title,
-          content: page.summary || 'No summary available',
-          confidence: 0.7
-        }];
-      }
-      
-      console.log('Extracted knowledge:', knowledge);
-      
-      // If no workspace is specified, use the default workspace
-      let targetWorkspaceId = workspaceId;
-      
-      if (targetWorkspaceId === null) {
-        // Get or create default workspace
-        let defaultWorkspace = await db.workspaces.where('name').equals('Default').first();
-        
-        if (!defaultWorkspace) {
-          const defaultId = await db.workspaces.add({
-            name: 'Default',
-            description: 'Default workspace',
-            color: '#4299E1',
-            createdAt: new Date(),
-            lastAccessed: new Date()
-          });
-          defaultWorkspace = await db.workspaces.get(defaultId as number);
-          targetWorkspaceId = defaultWorkspace?.id || null;
-        } else {
-          targetWorkspaceId = defaultWorkspace.id!;
-        }
-      }
-      
-      // Store knowledge points with workspace ID
-      for (const point of knowledge) {
-        await db.knowledge.add({
-          topic: point.topic,
-          content: point.content,
-          sourcePages: [page.id!],
-          lastUpdated: new Date(),
-          confidence: point.confidence,
-          tags: page.topics || [],
-          workspaceId: targetWorkspaceId!
-        });
-      }
-      
-      console.log('Knowledge stored successfully in workspace:', targetWorkspaceId);
-    } catch (error) {
-      console.error('Error processing page for knowledge:', error);
-      throw error;
-    }
   }
 
   /**
-   * Answer a question from saved knowledge. Relevant items are picked locally
-   * (see retrieval.ts), so only those go to the AI, in a single request, and
-   * the answer cites the pages they came from.
+   * Turn a saved page's key points into knowledge notes. Until 2.1 this was a
+   * second AI request per save; the analysis already has the key points, so this
+   * halves the requests per save (which matters on Gemini's free-tier limits) and
+   * can't fail after the page itself was saved.
    */
-  async queryKnowledge(query: string, knowledgeItems: Knowledge[]): Promise<KnowledgeAnswer> {
-    if (!knowledgeItems || knowledgeItems.length === 0) {
-      return {
-        relevantKnowledge: [],
-        sources: [],
-        synthesizedAnswer: 'No knowledge items found. Try analyzing some pages first.'
-      };
+  async processPage(page: Page, workspaceId: number | null = null): Promise<void> {
+    const targetWorkspaceId = workspaceId ?? (await defaultWorkspaceId());
+    const topic = stripSiteName(page.title || '') || page.title || page.url;
+    const points = (page.keyPoints || []).filter((p) => typeof p === 'string' && p.trim());
+    const contents = points.length ? points : [page.summary || page.title || page.url];
+    await db.knowledge.bulkAdd(
+      contents.map((content) => ({
+        topic,
+        content,
+        sourcePages: [page.id!],
+        lastUpdated: new Date(),
+        confidence: 0.9,
+        tags: page.topics || [],
+        workspaceId: targetWorkspaceId,
+      }))
+    );
+  }
+
+  /**
+   * Answer a question from saved reading. Pages are ranked locally (see
+   * retrieval.ts) using their title, topics, summary, key points and notes, and
+   * only the best few go to the AI, in one request, with numbered sources.
+   *
+   * If no words match (a differently worded or very general question, such as
+   * "what did I read this week?"), the most recent pages go instead and the AI
+   * says whether they answer it, rather than refusing locally.
+   */
+  async queryKnowledge(
+    query: string,
+    knowledgeItems: Knowledge[],
+    { allPages = false }: { allPages?: boolean } = {}
+  ): Promise<KnowledgeAnswer> {
+    const notesByPage = new Map<number, Knowledge[]>();
+    for (const k of knowledgeItems) {
+      const id = k.sourcePages?.[0];
+      if (id === undefined) continue;
+      if (!notesByPage.has(id)) notesByPage.set(id, []);
+      notesByPage.get(id)!.push(k);
+    }
+    // Across all workspaces, search every saved page: before 2.1 a page could be
+    // saved without notes (the second AI request failed), and it should still count.
+    const pages = allPages
+      ? await db.pages.toArray()
+      : (await db.pages.bulkGet([...notesByPage.keys()])).filter((p): p is Page => !!p);
+    if (pages.length === 0) {
+      return { relevantKnowledge: [], sources: [], synthesizedAnswer: 'Nothing saved here yet. Save a few pages first, then ask about them.' };
     }
 
-    const sourceIds = [...new Set(knowledgeItems.flatMap((k) => k.sourcePages || []))];
-    const pages = await db.pages.bulkGet(sourceIds);
-    const pageById = new Map<number, Page>();
-    pages.forEach((p, i) => p && pageById.set(sourceIds[i], p));
+    const ranked = rankByQuery(query, pages, (p) => {
+      const notes = notesByPage.get(p.id!) || [];
+      return [
+        [p.title, 2],
+        [(p.topics || []).join(' '), 2],
+        [p.summary, 1],
+        [(p.keyPoints || []).join(' '), 1],
+        [notes.map((k) => `${k.topic} ${k.content} ${(k.tags || []).join(' ')}`).join(' '), 1],
+      ];
+    }, MAX_CONTEXT_PAGES).map((r) => r.item);
 
-    const ranked = rankByQuery(query, knowledgeItems, (k) => [
-      [k.topic, 2],
-      [k.content, 1],
-      [(k.tags || []).join(' '), 1],
-      [pageById.get(k.sourcePages?.[0] ?? -1)?.title || '', 1],
-    ], MAX_CONTEXT_ITEMS).map((r) => r.item);
+    const matched = ranked.length > 0;
+    const chosen = matched
+      ? ranked
+      : [...pages].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, MAX_CONTEXT_PAGES);
 
-    if (ranked.length === 0) {
-      return {
-        relevantKnowledge: [],
-        sources: [],
-        synthesizedAnswer: 'Nothing in your saved reading matches that. Try different words, or analyze more pages on this topic.'
-      };
-    }
-
-    // Number each source page once, in order of relevance.
-    const sources: KnowledgeSource[] = [];
-    const sourceNumber = (pageId?: number): number | null => {
-      if (pageId === undefined) return null;
-      const page = pageById.get(pageId);
-      if (!page) return null;
-      let index = sources.findIndex((s) => s.pageId === pageId);
-      if (index < 0) {
-        sources.push({ pageId, title: page.title || page.url, url: page.url });
-        index = sources.length - 1;
-      }
-      return index + 1;
-    };
-
-    const context = ranked
-      .map((k) => {
-        const n = sourceNumber(k.sourcePages?.[0]);
-        return `${n ? `[${n}] ` : ''}${k.topic}: ${k.content}`;
+    const sources: KnowledgeSource[] = chosen.map((p) => ({ pageId: p.id!, title: p.title || p.url, url: p.url }));
+    const context = chosen
+      .map((p, i) => {
+        const points = new Set<string>([...(p.keyPoints || []), ...(notesByPage.get(p.id!) || []).map((k) => k.content)]);
+        const lines = [`[${i + 1}] ${p.title || p.url}`];
+        if (p.summary) lines.push(`Summary: ${p.summary.slice(0, 700)}`);
+        if (points.size) lines.push(...[...points].slice(0, 8).map((x) => `- ${x}`));
+        return lines.join('\n');
       })
-      .join('\n');
-    const sourceList = sources.map((s, i) => `[${i + 1}] ${s.title}`).join('\n');
+      .join('\n\n');
 
-    const prompt = `Answer the question using only the notes below, which come from pages the user has read.
-
+    const prompt = `Answer the question using only the notes below, which come from pages the user has read and saved.
+${matched ? '' : "\nNone of the notes share words with the question, so these are the user's most recent pages. They may or may not be relevant.\n"}
 Notes:
 ${context}
-
-Sources:
-${sourceList || '(none)'}
 
 Question: ${query}
 
 Rules:
-- Use only the notes. If they don't answer the question, say so briefly and say what they do cover.
+- Use only the notes. If they don't answer the question, say so in one sentence and mention what the notes do cover.
 - Cite sources inline with their numbers, like [1] or [2][3].
 - Plain text, no JSON, no markdown headings. Keep it concise.`;
 
     const answer = (await this.llm.analyze(prompt)).trim();
 
+    // Only list sources the answer actually cites, keeping their numbers.
+    const cited = sources.map((s, i) => ({ s, n: i + 1 })).filter(({ n }) => new RegExp(`\\[${n}\\]`).test(answer));
+    const relevantKnowledge = (cited.length ? cited.map((c) => c.s.pageId) : matched ? chosen.map((p) => p.id!) : [])
+      .flatMap((id) => notesByPage.get(id) || []);
+
     return {
-      relevantKnowledge: ranked,
-      sources,
-      synthesizedAnswer: answer || 'Unable to generate an answer from the available knowledge.'
+      relevantKnowledge,
+      sources: cited.length ? cited.map((c) => ({ ...c.s, number: c.n })) : [],
+      synthesizedAnswer: answer || 'Unable to generate an answer from your saved reading.',
     };
   }
 }
 
-/** Notes sent to the AI per question. Keeps requests small as the knowledge base grows. */
-const MAX_CONTEXT_ITEMS = 12;
+/** Pages sent to the AI per question. Keeps requests small however much is saved. */
+const MAX_CONTEXT_PAGES = 8;
+
+async function defaultWorkspaceId(): Promise<number> {
+  const existing = await db.workspaces.where('name').equals('Default').first();
+  if (existing?.id) return existing.id;
+  return (await db.workspaces.add({
+    name: 'Default',
+    description: 'Default workspace',
+    color: '#4299E1',
+    createdAt: new Date(),
+    lastAccessed: new Date(),
+  })) as number;
+}
 
 export interface KnowledgeSource {
   pageId: number;
   title: string;
   url: string;
+  /** The number the answer cites it by, e.g. 2 for [2]. */
+  number?: number;
 }
 
 export interface KnowledgeAnswer {
   relevantKnowledge: Knowledge[];
   sources: KnowledgeSource[];
   synthesizedAnswer: string;
-} 
+}
