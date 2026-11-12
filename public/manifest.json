@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Mindstack – AI knowledge base & summarizer",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Turn what you read into a searchable AI knowledge base. Summaries & Q&A via GPT, Claude or Gemini. Export to Obsidian & Notion.",
   "permissions": [
     "activeTab",
