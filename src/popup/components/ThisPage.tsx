@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { KeyRound, Loader, Sparkles, TextSelect } from 'lucide-react';
+import { ArrowRight, KeyRound, Loader, Sparkles, TextSelect } from 'lucide-react';
+import { SiteTile, hostOf } from './ui';
 import { db } from '@/storage/db';
 import { findRelated } from '@/services/related';
 import { getPrefs, updatePrefs } from '@/services/prefs';
@@ -125,27 +126,38 @@ const ThisPage: React.FC<ThisPageProps> = ({
   }
 
   const title = currentPage?.metadata.title || '';
-  const primary =
-    'w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-colors';
-  const secondary =
-    'w-full py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center justify-center gap-2';
+  const url = currentPage?.metadata.url || '';
+  const pageHeader = (
+    <div className="flex items-start gap-3">
+      <SiteTile url={url} size={32} />
+      <div className="min-w-0">
+        <h2 className="text-[15px] font-semibold text-slate-900 leading-snug line-clamp-2">{title}</h2>
+        <p className="text-xs text-slate-400 truncate">{hostOf(url)}</p>
+      </div>
+    </div>
+  );
 
   let body: React.ReactNode = null;
   if (phase === 'checking') {
-    body = <div className="py-10 flex justify-center text-gray-400"><Loader size={18} className="animate-spin" /></div>;
+    body = <div className="py-16 flex justify-center text-slate-300"><Loader size={20} className="animate-spin" /></div>;
   } else if (phase === 'saving') {
     body = (
-      <div className="space-y-3" data-testid="saving">
-        <h2 className="text-base font-semibold text-gray-900 leading-snug line-clamp-2">{title}</h2>
-        <p className="flex items-center gap-2 text-sm text-blue-700">
-          <Loader size={15} className="animate-spin" /> Summarizing and saving…
-        </p>
-        <div className="space-y-2 animate-pulse">
-          <div className="h-3 bg-gray-100 rounded w-full" />
-          <div className="h-3 bg-gray-100 rounded w-11/12" />
-          <div className="h-3 bg-gray-100 rounded w-4/6" />
+      <div className="ms-card ms-in p-4 space-y-4" data-testid="saving">
+        {pageHeader}
+        <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75 animate-ping" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-blue-600" />
+          </span>
+          Summarizing and saving…
         </div>
-        <p className="text-xs text-gray-400">You can close this. Saving carries on in the background.</p>
+        <div className="space-y-2.5 animate-pulse">
+          <div className="h-2.5 bg-slate-100 rounded-full w-full" />
+          <div className="h-2.5 bg-slate-100 rounded-full w-11/12" />
+          <div className="h-2.5 bg-slate-100 rounded-full w-9/12" />
+          <div className="h-16 bg-slate-50 rounded-xl w-full mt-3" />
+        </div>
+        <p className="text-xs text-slate-400">You can close this. Saving carries on in the background.</p>
       </div>
     );
   } else if (phase === 'saved' && page) {
@@ -161,49 +173,64 @@ const ThisPage: React.FC<ThisPageProps> = ({
     );
   } else if (!currentPage) {
     body = (
-      <div className="py-6 text-center space-y-2">
-        <Sparkles size={22} className="mx-auto text-blue-500" />
-        <p className="text-sm text-gray-700">Open an article, then click Mindstack to summarize and save it.</p>
-        {shortcut && <p className="text-xs text-gray-500">Or press <kbd className="px-1 py-0.5 border rounded bg-gray-50">{shortcut}</kbd> on any page.</p>}
+      <div className="ms-card ms-in px-6 py-10 text-center">
+        <div className="mx-auto mb-4 h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+          <Sparkles size={22} className="text-blue-600" />
+        </div>
+        <p className="text-sm font-medium text-slate-800">Open an article to get started</p>
+        <p className="mt-1 text-sm text-slate-500">Then click Mindstack and it is summarized and saved for you.</p>
+        {shortcut && (
+          <p className="mt-4 text-xs text-slate-400">
+            Or press <kbd className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-sans">{shortcut}</kbd> on any page.
+          </p>
+        )}
       </div>
     );
   } else if (settingsLoaded && !hasApiKey) {
     body = (
-      <div className="space-y-3">
-        <h2 className="text-base font-semibold text-gray-900 leading-snug line-clamp-2">{title}</h2>
-        <div className="rounded-xl bg-blue-50 p-4 space-y-2" data-testid="connect-ai">
-          <p className="text-sm font-medium text-gray-900">Connect an AI to start</p>
-          <p className="text-sm text-gray-600">
+      <div className="space-y-3 ms-in">
+        <div className="ms-card p-4">{pageHeader}</div>
+        <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 p-5 text-white shadow-md shadow-blue-600/20" data-testid="connect-ai">
+          <div className="mb-3 h-9 w-9 rounded-xl bg-white/15 flex items-center justify-center">
+            <KeyRound size={18} />
+          </div>
+          <p className="text-base font-semibold">Connect an AI to start</p>
+          <p className="mt-1 text-sm text-blue-100 leading-relaxed">
             Mindstack summarizes pages with your own AI key, so your reading stays yours. Google Gemini has a free tier.
           </p>
-          <button onClick={onOpenSettings} className={primary}>
-            <KeyRound size={15} /> Add a key
+          <button
+            onClick={onOpenSettings}
+            className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 transition-colors"
+          >
+            Add a key <ArrowRight size={15} />
           </button>
         </div>
       </div>
     );
   } else {
     body = (
-      <div className="space-y-3">
-        <h2 className="text-base font-semibold text-gray-900 leading-snug line-clamp-2">{title}</h2>
-        {removed && <p className="text-xs text-gray-500">Removed from your Mindstack.</p>}
+      <div className="ms-card ms-in p-4 space-y-4">
+        {pageHeader}
+        {removed && <p className="text-xs text-slate-500">Removed from your Mindstack.</p>}
         {phase === 'error' && (
-          <p className="text-sm text-red-700 bg-red-50 rounded-lg p-3" data-testid="save-error">{error}</p>
+          <p className="text-sm text-red-700 bg-red-50 rounded-xl p-3" data-testid="save-error">{error}</p>
         )}
-        {hasSelection && (
-          <button onClick={() => save(true)} className={primary}>
-            <TextSelect size={15} /> Summarize selection ({selectionWords} words)
+        <div className="space-y-2">
+          {hasSelection && (
+            <button onClick={() => save(true)} className="ms-btn w-full">
+              <TextSelect size={15} /> Summarize selection ({selectionWords} words)
+            </button>
+          )}
+          <button onClick={() => save(false)} className={hasSelection ? 'ms-btn-soft w-full' : 'ms-btn w-full'}>
+            <Sparkles size={15} /> {phase === 'error' ? 'Try again' : hasSelection ? 'Whole page instead' : 'Summarize & save'}
           </button>
-        )}
-        <button onClick={() => save(false)} className={hasSelection ? secondary : primary}>
-          <Sparkles size={15} /> {phase === 'error' ? 'Try again' : hasSelection ? 'Whole page instead' : 'Summarize & save'}
-        </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {body}
       {currentPage && phase !== 'checking' && (
         <RelatedReading page={currentPage} refreshKey={savedCount} hideSaved />

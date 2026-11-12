@@ -46,18 +46,18 @@ const SearchBar: React.FC<SearchBarProps> = ({ onResultsChange }) => {
   return (
     <div className="relative">
       <div className="relative flex items-center">
-        <Search size={16} className="absolute left-3 text-gray-400" />
+        <Search size={15} className="absolute left-3.5 text-slate-400" />
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search pages..."
-          className="w-full pl-9 pr-8 py-2 border rounded-lg"
+          className="w-full pl-10 pr-9 py-2.5 text-sm rounded-full bg-white shadow-sm ring-1 ring-slate-900/5 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
         />
         {query && (
           <button
             onClick={() => setQuery('')}
-            className="absolute right-2 p-1 hover:bg-gray-100 rounded-full"
+            className="absolute right-2.5 p-1 hover:bg-slate-100 rounded-full"
           >
             <X size={14} className="text-gray-400" />
           </button>

@@ -14,6 +14,7 @@ import Onboarding from './components/Onboarding';
 import FreeKeyHint from './components/FreeKeyHint';
 import SuggestionsCard from './components/SuggestionsCard';
 import ThisPage from './components/ThisPage';
+import { SiteTile, hostOf } from './components/ui';
 import { extractPage, type ExtractedPage } from '@/inpage/extract';
 import { GEMINI_DEFAULT_MODEL } from '@/services/geminiModels';
 import { DEFAULT_PREFS, getPrefs, updatePrefs, type Prefs } from '@/services/prefs';
@@ -51,6 +52,7 @@ const App: React.FC = () => {
   const [availableModels, setAvailableModels] = useState<{id: string, name?: string}[]>([]);
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const knowledgeExplorerRef = useRef<KnowledgeExplorerRef>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'api' | 'premium' | 'integrations'>('api');
@@ -110,6 +112,11 @@ const App: React.FC = () => {
     knowledgeExplorerRef.current?.reloadKnowledgeBase();
     setShowRatingPrompt(await shouldShowRatingPrompt());
   };
+
+  // Each tab starts at the top.
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+  }, [activeTab]);
 
   const changePrefs = async (patch: Partial<Prefs>) => setPrefs(await updatePrefs(patch));
 
@@ -205,40 +212,42 @@ const App: React.FC = () => {
 
   return (
     <div className="relative h-full">
-      <div className="w-full h-full bg-white overflow-auto">
+      <div className="w-full h-full bg-slate-50 overflow-auto">
         <div className="w-full h-full flex flex-col">
-          <header className="px-4 pt-3 pb-2 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <BookOpen className="text-blue-600" size={18} />
-              <h1 className="text-base font-semibold text-gray-800">Mindstack</h1>
+          <header className="px-4 pt-4 pb-3 flex justify-between items-center">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm shadow-blue-600/30">
+                <BookOpen className="text-white" size={16} />
+              </div>
+              <h1 className="text-[15px] font-semibold tracking-tight text-slate-900">Mindstack</h1>
             </div>
             <button
               onClick={() => setShowSettings(true)}
-              className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+              className="h-8 w-8 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-800 hover:bg-white hover:shadow-sm transition-all"
               aria-label="Settings"
             >
-              <Settings size={17} className="text-gray-500" />
+              <Settings size={17} />
             </button>
           </header>
 
-          <nav className="px-4 flex gap-4 border-b border-gray-100" role="tablist">
+          <nav className="mx-4 p-1 flex gap-1 rounded-full bg-slate-200/60" role="tablist">
             {TABS.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 role="tab"
                 aria-selected={activeTab === id}
                 onClick={() => setActiveTab(id)}
-                className={`py-2 -mb-px text-sm font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
-                  activeTab === id ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-800'
+                className={`flex-1 py-1.5 rounded-full text-sm font-medium flex items-center justify-center gap-1.5 transition-all ${
+                  activeTab === id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Icon size={14} />
+                <Icon size={14} className={activeTab === id ? 'text-blue-600' : ''} />
                 {label}
               </button>
             ))}
           </nav>
 
-          <main className="px-4 py-4 flex-grow overflow-auto">
+          <main ref={mainRef} className="px-4 pt-3 pb-4 flex-grow overflow-auto">
             {activeTab === 'page' && (
               <ThisPage
                 currentPage={currentPage}
@@ -256,25 +265,29 @@ const App: React.FC = () => {
               <div className="space-y-3">
                 <SearchBar onResultsChange={setSavedPages} />
                 {savedPages.length > 0 ? (
-                  <div className="divide-y divide-gray-100">
+                  <div className="space-y-2">
                     {savedPages.map((page) => (
                       <article
                         key={page.id}
-                        className="py-3 cursor-pointer group"
+                        className="ms-card p-3 flex gap-3 cursor-pointer group hover:shadow-md hover:ring-blue-200 transition-all"
                         onClick={() => window.open(page.url, '_blank')}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <h3 className="text-sm font-medium text-gray-900 line-clamp-1 group-hover:text-blue-700">{page.title}</h3>
-                          <time className="text-xs text-gray-400 whitespace-nowrap">
-                            {new Date(page.timestamp).toLocaleDateString()}
-                          </time>
+                        <SiteTile url={page.url} />
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm font-medium text-slate-900 line-clamp-1 group-hover:text-blue-700">{page.title}</h3>
+                          <p className="text-xs text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">{page.summary}</p>
+                          <p className="mt-1.5 text-[11px] text-slate-400">
+                            {hostOf(page.url)} · {new Date(page.timestamp).toLocaleDateString()}
+                          </p>
                         </div>
-                        <p className="text-xs text-gray-600 mt-1 line-clamp-2">{page.summary}</p>
                       </article>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-center py-8 text-sm text-gray-500">Nothing saved yet. Pages you save appear here.</p>
+                  <div className="ms-card px-6 py-10 text-center">
+                    <p className="text-sm font-medium text-slate-800">Nothing saved yet</p>
+                    <p className="mt-1 text-sm text-slate-500">Pages you save appear here.</p>
+                  </div>
                 )}
               </div>
             )}
@@ -290,37 +303,33 @@ const App: React.FC = () => {
 
           {showRatingPrompt && <RatingPrompt onDone={() => setShowRatingPrompt(false)} />}
 
-          <footer className="px-4 py-2 border-t border-gray-100 flex justify-center items-center">
+          <footer className="px-4 py-2 flex justify-center items-center">
             <FeedbackButton />
           </footer>
         </div>
 
         {/* Settings Modal with improved design */}
         {showSettings && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl shadow-xl w-[420px] max-w-full max-h-[95vh] overflow-y-auto">
-              <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center">
+          <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm flex items-end justify-center z-50 p-2">
+            <div className="bg-white rounded-3xl shadow-2xl w-[420px] max-w-full max-h-[96vh] overflow-y-auto ms-in">
+              <div className="px-5 pt-5 pb-3 flex justify-between items-center">
                 <h2 className="text-lg font-medium text-gray-800 flex items-center">
-                  <Cog size={18} className="mr-2 text-blue-600" />
+                  <Cog size={18} className="mr-2 text-slate-400" />
                   Settings
                 </h2>
                 <button
                   onClick={() => setShowSettings(false)}
-                  className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
                 >
                   <X size={16} />
                 </button>
               </div>
 
               {/* Settings Tabs */}
-              <div className="flex border-b border-gray-200">
+              <div className="mx-5 mb-1 p-1 flex gap-1 rounded-full bg-slate-100">
                 <button
                   onClick={() => setSettingsTab('api')}
-                  className={`flex-1 py-3 px-4 text-sm font-medium flex items-center justify-center gap-2 ${
-                    settingsTab === 'api'
-                      ? 'text-blue-600 border-b-2 border-blue-600'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
+                  className={`flex-1 py-1.5 px-3 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-all ${settingsTab === 'api' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   <Key size={16} />
                   General
@@ -328,11 +337,7 @@ const App: React.FC = () => {
                 {PAID_TIER_ENABLED && (
                 <button
                   onClick={() => setSettingsTab('premium')}
-                  className={`flex-1 py-3 px-4 text-sm font-medium flex items-center justify-center gap-2 ${
-                    settingsTab === 'premium'
-                      ? 'text-blue-600 border-b-2 border-blue-600'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
+                  className={`flex-1 py-1.5 px-3 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-all ${settingsTab === 'premium' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   <Crown size={16} className={isPremium ? 'text-amber-500' : ''} />
                   Premium
@@ -345,11 +350,7 @@ const App: React.FC = () => {
                 )}
                 <button
                   onClick={() => setSettingsTab('integrations')}
-                  className={`flex-1 py-3 px-4 text-sm font-medium flex items-center justify-center gap-2 ${
-                    settingsTab === 'integrations'
-                      ? 'text-blue-600 border-b-2 border-blue-600'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
+                  className={`flex-1 py-1.5 px-3 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-all ${settingsTab === 'integrations' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   <Folder size={16} />
                   Integrations
@@ -365,7 +366,7 @@ const App: React.FC = () => {
                     <select
                       value={settings.provider}
                       onChange={(e) => handleProviderChange(e.target.value)}
-                      className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="ms-field"
                     >
                       <option value="openai">OpenAI</option>
                       <option value="anthropic">Anthropic</option>
@@ -381,7 +382,7 @@ const App: React.FC = () => {
                       type="password"
                       value={settings.apiKey}
                       onChange={(e) => setSettings({...settings, apiKey: e.target.value})}
-                      className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="ms-field"
                       placeholder={`Enter your ${settings.provider} API key`}
                     />
                   </div>
@@ -400,7 +401,7 @@ const App: React.FC = () => {
                     <select
                       value={settings.model}
                       onChange={(e) => setSettings({...settings, model: e.target.value})}
-                      className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="ms-field"
                     >
                       {availableModels.length === 0 ? (
                         <option value="" disabled>
@@ -422,13 +423,12 @@ const App: React.FC = () => {
                       setSavedKey(settings.apiKey || '');
                       setShowSettings(false);
                     }}
-                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg
-                      hover:bg-blue-700 transition-colors font-medium mt-4 shadow-sm"
+                    className="ms-btn w-full mt-2"
                   >
                     Save Settings
                   </button>
 
-                  <div className="pt-4 border-t border-gray-200 space-y-3 text-sm" data-testid="summary-prefs">
+                  <div className="rounded-2xl bg-slate-50 p-4 space-y-3 text-sm" data-testid="summary-prefs">
                     <label className="flex items-start gap-3 cursor-pointer">
                       <input
                         type="checkbox"
@@ -447,7 +447,7 @@ const App: React.FC = () => {
                         aria-label="Summary length"
                         value={prefs.summaryLength}
                         onChange={(e) => changePrefs({ summaryLength: e.target.value as SummaryLength })}
-                        className="p-1.5 bg-gray-50 border border-gray-300 rounded-lg"
+                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       >
                         <option value="short">Short</option>
                         <option value="medium">Medium</option>

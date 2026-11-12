@@ -30,7 +30,7 @@ const RatingPrompt: React.FC<RatingPromptProps> = ({ onDone }) => {
 
   return (
     <div
-      className="mx-5 mb-3 p-3 rounded-lg border border-amber-200 bg-amber-50 flex items-start gap-3"
+      className="mx-4 mb-3 p-3 rounded-2xl ring-1 ring-amber-200 bg-amber-50 flex items-start gap-3 ms-in"
       role="status"
       data-testid="rating-prompt"
     >
@@ -40,13 +40,13 @@ const RatingPrompt: React.FC<RatingPromptProps> = ({ onDone }) => {
         <div className="mt-2 flex gap-2">
           <button
             onClick={() => finish(true)}
-            className="px-3 py-1 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded-md"
+            className="px-3.5 py-1 text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-full"
           >
             Rate it
           </button>
           <button
             onClick={() => finish(false)}
-            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 rounded-full hover:bg-amber-100"
           >
             No thanks
           </button>

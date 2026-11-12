@@ -251,7 +251,7 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
               aria-label="Workspace"
               value={selectedWorkspace || ''}
               onChange={(e) => setSelectedWorkspace(e.target.value ? Number(e.target.value) : null)}
-              className="w-full p-1.5 border border-gray-200 rounded-lg text-sm text-gray-700"
+              className="w-full rounded-full bg-white shadow-sm ring-1 ring-slate-900/5 border-0 px-3 py-1.5 text-sm text-slate-700 focus:ring-2 focus:ring-blue-500/40"
             >
               <option value="">All workspaces</option>
               {workspaces.map(workspace => (
@@ -261,27 +261,29 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
               ))}
             </select>
           )}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask about anything you've saved..."
-              className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') searchKnowledge();
-              }}
-            />
-            <button
-              onClick={searchKnowledge}
-              disabled={isSearching}
-              className="px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-400 flex items-center"
-            >
-              {isSearching ? <Loader size={16} className="animate-spin" /> : 'Ask'}
-            </button>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 min-w-0">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Ask about anything you've saved..."
+                className="w-full pl-4 pr-[68px] py-2.5 text-sm rounded-full bg-white shadow-sm ring-1 ring-slate-900/5 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') searchKnowledge();
+                }}
+              />
+              <button
+                onClick={searchKnowledge}
+                disabled={isSearching}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 px-3 rounded-full bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center"
+              >
+                {isSearching ? <Loader size={14} className="animate-spin" /> : 'Ask'}
+              </button>
+            </div>
             <button
               onClick={() => setShowWorkspaceModal(true)}
-              className="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-gray-100"
+              className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm transition-all"
               title="Workspaces"
               aria-label="Workspaces"
             >
@@ -291,13 +293,14 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
 
           {/* Answer Display */}
           {answer && (
-            <div className="bg-blue-50 p-3 rounded-lg text-sm" data-testid="knowledge-answer">
-              <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">{answer}</p>
+            <div className="ms-card ms-in p-4 text-sm" data-testid="knowledge-answer">
+              <p className="ms-label mb-2 flex items-center gap-1.5"><Brain size={13} className="text-blue-500" /> Answer</p>
+              <p className="text-slate-800 whitespace-pre-wrap leading-relaxed">{answer}</p>
               {sources.length > 0 && (
-                <ol className="mt-3 pt-3 border-t border-blue-100 space-y-1 text-sm" data-testid="answer-sources">
+                <ol className="mt-3 pt-3 border-t border-slate-100 space-y-1 text-sm" data-testid="answer-sources">
                   {sources.map((source, i) => (
                     <li key={source.pageId} className="flex gap-1.5 min-w-0">
-                      <span className="text-blue-900 font-medium shrink-0">[{source.number ?? i + 1}]</span>
+                      <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-50 px-1 text-[11px] font-semibold text-blue-700 shrink-0">{source.number ?? i + 1}</span>
                       <a
                         href={source.url}
                         target="_blank"
@@ -318,8 +321,10 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
         {/* Notes */}
         <div className="flex-1 overflow-y-auto">
           {knowledgeItems.length === 0 && hasSearched ? null : knowledgeItems.length === 0 ? (
-            <div className="text-center py-8 space-y-2">
-              <Book size={26} className="mx-auto text-gray-300" />
+            <div className="ms-card px-6 py-10 text-center space-y-2">
+              <div className="mx-auto mb-2 h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+                <Book size={22} className="text-blue-600" />
+              </div>
               <p className="text-sm font-medium text-gray-800">Nothing saved yet</p>
               <p className="text-sm text-gray-500">Save a few pages, then ask questions across everything you've read.</p>
               {onGoToPage && (
@@ -330,10 +335,10 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
             </div>
           ) : (
             <>
-              <h3 className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-1">
+              <h3 className="ms-label mb-2 px-1">
                 {hasSearched ? 'Notes used' : 'Recent notes'}
               </h3>
-              <div className="divide-y divide-gray-100">
+              <div className="ms-card px-4 divide-y divide-slate-100">
                 {knowledgeItems.map((item) => (
                   <div key={item.id} className="py-2.5 relative group pr-6">
                     <button
@@ -343,8 +348,8 @@ const KnowledgeExplorer = forwardRef<KnowledgeExplorerRef, KnowledgeExplorerProp
                     >
                       <Trash2 size={14} />
                     </button>
-                    <p className="text-xs text-gray-400 line-clamp-1">{item.topic}</p>
-                    <p className="text-sm text-gray-700">{item.content}</p>
+                    <p className="text-[11px] text-slate-400 line-clamp-1">{item.topic}</p>
+                    <p className="text-sm text-slate-700 leading-snug">{item.content}</p>
                   </div>
                 ))}
               </div>

@@ -63,7 +63,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onOpenSettings }) =
   };
 
   return (
-    <div className="fixed inset-0 bg-white z-50 flex flex-col">
+    <div className="fixed inset-0 bg-gradient-to-b from-white to-slate-50 z-50 flex flex-col">
       {/* Progress dots */}
       <div className="flex justify-center gap-2 pt-6 pb-4">
         {STEPS.map((_, idx) => (
@@ -83,11 +83,11 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onOpenSettings }) =
 
       {/* Content */}
       <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
-        <div className={`w-20 h-20 rounded-2xl ${colors.bg} ${colors.border} border-2 flex items-center justify-center mb-6`}>
+        <div className={`w-20 h-20 rounded-3xl ${colors.bg} flex items-center justify-center mb-6 shadow-sm ms-in`}>
           <Icon size={40} className={colors.text} />
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-3">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-3">
           {step.title}
         </h1>
 
@@ -96,7 +96,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onOpenSettings }) =
         </p>
 
         {step.isSetup && (
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg text-left w-full max-w-sm">
+          <div className="mt-6 p-4 bg-white rounded-2xl shadow-sm ring-1 ring-slate-900/5 text-left w-full max-w-sm">
             <p className="text-sm text-gray-700 mb-2">
               <strong>Supported providers:</strong>
             </p>
@@ -130,7 +130,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onOpenSettings }) =
       <div className="p-6 space-y-3">
         <button
           onClick={handleNext}
-          className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"
+          className="ms-btn w-full py-3"
         >
           {isLastStep ? (
             <>
@@ -147,7 +147,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onOpenSettings }) =
 
         <button
           onClick={handleSkip}
-          className="w-full py-2 text-gray-500 hover:text-gray-700 text-sm transition-colors"
+          className="w-full py-2 rounded-full text-slate-500 hover:text-slate-700 hover:bg-slate-100 text-sm transition-colors"
         >
           {isLastStep ? 'Skip for now' : 'Skip tour'}
         </button>

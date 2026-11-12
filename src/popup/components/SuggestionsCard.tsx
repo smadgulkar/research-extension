@@ -67,8 +67,8 @@ const SuggestionsCard: React.FC<SuggestionsCardProps> = ({ variant = 'prompt' })
   if (variant === 'prompt') {
     if (on || dismissed) return null;
     return (
-      <div className="relative rounded-xl bg-indigo-50 p-3 text-sm" data-testid="suggestions-card">
-        <button onClick={dismiss} className="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600" aria-label="Not now">
+      <div className="relative rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50 ring-1 ring-indigo-100 p-4 text-sm ms-in" data-testid="suggestions-card">
+        <button onClick={dismiss} className="absolute top-2.5 right-2.5 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-white/60" aria-label="Not now">
           <X size={14} />
         </button>
         <p className="flex items-center gap-2 font-medium text-gray-900">
@@ -79,17 +79,17 @@ const SuggestionsCard: React.FC<SuggestionsCardProps> = ({ variant = 'prompt' })
           See what you've already read on a topic while you browse. Matching stays on your device.
         </p>
         <div className="mt-3 flex items-center gap-3">
-          <button onClick={turnOn} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700">
+          <button onClick={turnOn} className="px-4 py-1.5 rounded-full bg-indigo-600 text-white font-medium hover:bg-indigo-700 shadow-sm shadow-indigo-600/20">
             Turn on
           </button>
-          <button onClick={dismiss} className="text-gray-500 hover:text-gray-700">Not now</button>
+          <button onClick={dismiss} className="px-3 py-1.5 rounded-full text-slate-500 hover:text-slate-700 hover:bg-white/60">Not now</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="pt-4 border-t border-gray-200 space-y-2 text-sm" data-testid="suggestions-settings">
+    <div className="rounded-2xl bg-slate-50 p-4 space-y-2 text-sm" data-testid="suggestions-settings">
       <label className="flex items-start gap-3 cursor-pointer">
         <input
           type="checkbox"

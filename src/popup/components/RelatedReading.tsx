@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BookMarked, CheckCircle2 } from 'lucide-react';
 import { findRelated, type RelatedResult } from '@/services/related';
 import type { ExtractedPage } from '@/inpage/extract';
+import { SiteTile } from './ui';
 
 interface RelatedReadingProps {
   page: ExtractedPage;
@@ -34,26 +35,35 @@ const RelatedReading: React.FC<RelatedReadingProps> = ({ page, refreshKey, hideS
   if (!result || (!showSaved && result.related.length === 0)) return null;
 
   return (
-    <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-sm" data-testid="related-reading">
+    <div className="ms-card ms-in p-4 text-sm" data-testid="related-reading">
       {showSaved && result.saved && (
-        <p className="flex items-center gap-1.5 text-gray-700">
-          <CheckCircle2 size={15} className="text-green-600 shrink-0" />
+        <p className="flex items-center gap-1.5 text-slate-700">
+          <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
           Saved to your Mindstack on {new Date(result.saved.timestamp).toLocaleDateString()}
         </p>
       )}
       {result.related.length > 0 && (
         <>
-          <p className={`flex items-center gap-1.5 font-medium text-gray-900 ${showSaved ? 'mt-2' : ''}`}>
-            <BookMarked size={15} className="text-blue-600 shrink-0" />
+          <p className={`flex items-center gap-1.5 ms-label ${showSaved ? 'mt-3' : ''}`}>
+            <BookMarked size={13} className="text-blue-500 shrink-0" />
             Related from your reading
           </p>
-          <ul className="mt-1.5 space-y-1.5">
+          <ul className="mt-2 -mx-2 space-y-0.5">
             {result.related.map((r) => (
               <li key={r.pageId} className="min-w-0">
-                <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:underline font-medium block truncate" title={r.url}>
-                  {r.title}
+                <a
+                  href={r.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex gap-2.5 rounded-xl px-2 py-2 hover:bg-slate-50 transition-colors"
+                  title={r.url}
+                >
+                  <SiteTile url={r.url} size={26} />
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-slate-800">{r.title}</span>
+                    <span className="block text-xs text-slate-500 line-clamp-2">{r.snippet}</span>
+                  </span>
                 </a>
-                <p className="text-xs text-gray-600 line-clamp-2">{r.snippet}</p>
               </li>
             ))}
           </ul>

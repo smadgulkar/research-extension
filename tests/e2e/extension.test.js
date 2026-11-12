@@ -660,7 +660,7 @@ describe('Popup shows related reading for the current page', () => {
     await seedKnowledge(page, 0);
     await pointPopupAtFixture(page);
     await page.waitForSelector('[data-testid="related-reading"]', { timeout: 10000 });
-    const text = await page.$eval('[data-testid="related-reading"]', (el) => el.innerText);
+    const text = await page.$eval('[data-testid="related-reading"]', (el) => el.textContent);
     expect(text).toContain('Related from your reading');
     expect(text).toContain('Tidal energy explained');
     expect(text).not.toContain('Sourdough basics');
