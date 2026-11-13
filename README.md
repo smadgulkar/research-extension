@@ -47,3 +47,7 @@ Releases are automated. See [RELEASING.md](RELEASING.md).
 ## Feedback
 
 Found a bug or want a feature? [Open an issue](https://github.com/smadgulkar/research-extension/issues).
+
+## License
+
+Source available, not open source. Copyright (c) 2026 smadgulkar, all rights reserved. See [LICENSE](LICENSE).
